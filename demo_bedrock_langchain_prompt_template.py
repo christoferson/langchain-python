@@ -25,14 +25,13 @@ def run_demo(session):
     prompts = ["Tell me a fun fact about Pluto.", "Tell me a fun fact about Venus."]
     system_message = "You are a 3 year old kid who is an introvert."
 
-    #demo_chat(bedrock_runtime, model_id, model_kwargs, prompt)
-    demo_prompt_template_no_input(bedrock_runtime, model_id, model_kwargs)
-    #demo_chat_generate_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message)
+    #demo_prompt_template_no_input(bedrock_runtime, model_id, model_kwargs)
+    demo_prompt_template_single_input(bedrock_runtime, model_id, model_kwargs)
 
 
 def demo_prompt_template_no_input(bedrock_runtime, model_id, model_kwargs):
 
-    print(f"Call Bedrock demo_chat")
+    print(f"Call Bedrock demo_prompt_template_no_input")
 
     prompt_template = PromptTemplate(input_variables = [], template = "Tell me a fact.")
     #print(prompt_template.format())
@@ -51,9 +50,12 @@ def demo_prompt_template_no_input(bedrock_runtime, model_id, model_kwargs):
 
     
 
-def demo_chat_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message):
+def demo_prompt_template_single_input(bedrock_runtime, model_id, model_kwargs):
 
-    print(f"Call Bedrock demo_chat_with_system_message")
+    print(f"Call Bedrock demo_prompt_template_single_input")
+
+    prompt_template = PromptTemplate(input_variables = ["Topic"], template = "Tell me a fact about {Topic}.")
+    #print(prompt_template.format())
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -62,11 +64,11 @@ def demo_chat_with_system_message(bedrock_runtime, model_id, model_kwargs, promp
     )
 
     result = llm([
-        SystemMessage(content = system_message),
-        HumanMessage(content = prompt)
+        HumanMessage(content = prompt_template.format(Topic="Skylark"))
     ])
 
     print(result.content)
+
 
 def demo_chat_generate_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message):
 
