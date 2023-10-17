@@ -5,6 +5,8 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 
 from langchain.cache import InMemoryCache
 
+from langchain import PromptTemplate
+
 import json
 
 def run_demo(session):
@@ -24,13 +26,16 @@ def run_demo(session):
     system_message = "You are a 3 year old kid who is an introvert."
 
     #demo_chat(bedrock_runtime, model_id, model_kwargs, prompt)
-    demo_chat_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message)
+    demo_prompt_template_no_input(bedrock_runtime, model_id, model_kwargs)
     #demo_chat_generate_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message)
 
 
-def demo_chat(bedrock_runtime, model_id, model_kwargs, prompt):
+def demo_prompt_template_no_input(bedrock_runtime, model_id, model_kwargs):
 
     print(f"Call Bedrock demo_chat")
+
+    prompt_template = PromptTemplate(input_variables = [], template = "Tell me a fact.")
+    #print(prompt_template.format())
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -39,7 +44,7 @@ def demo_chat(bedrock_runtime, model_id, model_kwargs, prompt):
     )
 
     result = llm([
-        HumanMessage(content = prompt)
+        HumanMessage(content = prompt_template.format())
     ])
 
     print(result.content)
