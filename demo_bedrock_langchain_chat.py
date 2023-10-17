@@ -15,8 +15,11 @@ def run_demo(session):
     model_kwargs = { "temperature": 0.0 }
     prompt = "Tell me a fun fact about Pluto."
     prompts = ["Tell me a fun fact about Pluto.", "Tell me a fun fact about Venus."]
+    system_message = "You are a 3 year old kid who is an introvert."
 
-    demo_chat(bedrock_runtime, model_id, model_kwargs, prompt)
+    #demo_chat(bedrock_runtime, model_id, model_kwargs, prompt)
+    demo_chat_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message)
+    #demo_chat_generate_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message)
 
 
 def demo_chat(bedrock_runtime, model_id, model_kwargs, prompt):
@@ -36,3 +39,38 @@ def demo_chat(bedrock_runtime, model_id, model_kwargs, prompt):
     print(result.content)
 
     
+
+def demo_chat_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message):
+
+    print(f"Call Bedrock demo_chat_with_system_message")
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = model_id,
+        model_kwargs = model_kwargs,
+    )
+
+    result = llm([
+        SystemMessage(content = system_message),
+        HumanMessage(content = prompt)
+    ])
+
+    print(result.content)
+
+def demo_chat_generate_with_system_message(bedrock_runtime, model_id, model_kwargs, prompt, system_message):
+
+    print(f"Call Bedrock demo_chat_generate_with_system_message model_id={model_id}")
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = model_id,
+        model_kwargs = model_kwargs,
+    )
+
+    result = llm.generate([
+        [ SystemMessage(content = system_message), HumanMessage(content = prompt) ]
+    ])
+
+    for generation in result.generations:
+        print(generation[0].text)
+        print("")
