@@ -1,6 +1,9 @@
+import langchain
 from langchain.llms import Bedrock
 from langchain.chat_models import BedrockChat
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
+
+from langchain.cache import InMemoryCache
 
 import json
 
@@ -9,6 +12,9 @@ def run_demo(session):
     bedrock = session.client('bedrock')
 
     bedrock_runtime = session.client('bedrock-runtime', region_name="us-east-1")
+
+    # Enable Cache 
+    langchain.llm_cache = InMemoryCache()
 
     model_id = "anthropic.claude-instant-v1"
 
