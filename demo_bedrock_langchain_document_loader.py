@@ -1,4 +1,5 @@
 from langchain.document_loaders import CSVLoader
+from langchain.document_loaders import BSHTMLLoader
 
 def run_demo(session):
 
@@ -14,14 +15,27 @@ def run_demo(session):
     prompt = "What is the diameter of Earth?"
 
 
-    demo_load_csv(bedrock_runtime)
+    #demo_load_csv(bedrock_runtime)
+    demo_load_html(bedrock_runtime)
 
 
 def demo_load_csv(bedrock_runtime):
 
     print("Call demo_load_csv")
 
-    loader = CSVLoader("csv/demo.csv")
+    loader = CSVLoader("documents/demo.csv")
+
+    data = loader.load()
+
+    print(data)
+
+    print(data[0].page_content)
+
+def demo_load_html(bedrock_runtime):
+
+    print("Call demo_load_html")
+
+    loader = BSHTMLLoader("documents/demo.html")
 
     data = loader.load()
 
