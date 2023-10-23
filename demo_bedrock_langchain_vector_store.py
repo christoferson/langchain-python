@@ -30,7 +30,8 @@ def run_demo(session):
     #demo_load_embed_save(bedrock_runtime)
     prompt = "What is the origin of the name New York?"
     prompt = "Etymology New York"
-    demo_vectordb_similarity_search(bedrock_runtime, model_id, prompt)
+    #demo_vectordb_similarity_search(bedrock_runtime, model_id, prompt)
+    demo_vectordb_retriever(bedrock_runtime, model_id, prompt)
 
 
 
@@ -69,10 +70,33 @@ def demo_vectordb_similarity_search(bedrock_runtime : str, model_id, prompt):
         model_id = model_id
     )
 
-    vectordb = Chroma(embedding_function=embeddings, persist_directory="vectordb/chromadb/demo.db")
+    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
 
     similar_docs = vectordb.similarity_search(prompt, k=2)
 
     print(f"Matches: {len(similar_docs)}")
-    print(f"{similar_docs[0].metadata}")
-    print(f"{similar_docs[0].page_content}")
+    for similar_doc in similar_docs:
+        print("---------------------------------")
+        print(f"{similar_doc.metadata}")
+        print(f"{similar_doc.page_content}")
+
+def demo_vectordb_retriever(bedrock_runtime : str, model_id, prompt):
+
+    print("Call demo_vectordb_retriever")
+
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = model_id
+    )
+
+    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+
+    retriever = vectordb.as_retriever()
+
+    similar_docs = retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
+
+    print(f"Matches: {len(similar_docs)}")
+    for similar_doc in similar_docs:
+        print("---------------------------------")
+        print(f"{similar_doc.metadata}")
+        print(f"{similar_doc.page_content}")
