@@ -16,8 +16,12 @@ from langchain.embeddings import BedrockEmbeddings
 from langchain.vectorstores import Chroma
 
 from langchain.retrievers.multi_query import MultiQueryRetriever
+from pydantic import BaseModel, Field
+from langchain.output_parsers import PydanticOutputParser
 
+from typing import List
 from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
@@ -33,9 +37,7 @@ def run_demo(session):
     model_id = "amazon.titan-embed-text-v1"
 
     model_kwargs = { "temperature": 0.0 }
-#['Here are 3 alternative questions for "What is the origin of the name New York?":', '', 'What was the original name of the city now known as New York and how did it get its current name?', '', 'What is the etymology and meaning behind the name of the city of New York? ', '', 
-#'What was the place that is now called New York originally called by native inhabitants or early European settlers, and when/why did it start being referred to as New 
-#York?']
+
     #demo_load_embed_save(bedrock_runtime)
     prompt = "What is the meaning behind the name New York?"
     #prompt = "Etymology New York"
@@ -44,7 +46,9 @@ def run_demo(session):
 
     #demo_vectordb_similarity_search(bedrock_runtime, model_id, prompt)
     #demo_vectordb_retriever(bedrock_runtime, model_id, prompt)
-    demo_vectordb_multiquery_retriever(bedrock_runtime, "anthropic.claude-instant-v1", model_kwargs, prompt)
+    #demo_vectordb_multiquery_retriever(bedrock_runtime, "anthropic.claude-instant-v1", model_kwargs, prompt)
+    demo_vectordb_multiquery_retriever_m2(bedrock_runtime, prompt = prompt)
+
 
 def setup_loggers():
     logging.basicConfig()
@@ -116,16 +120,7 @@ def demo_vectordb_retriever(bedrock_runtime : str, model_id, prompt):
         print(f"{similar_doc.metadata}")
         print(f"{similar_doc.page_content}")
 
-PROMPT = PromptTemplate(
-    input_variables=["question"],
-    template="""You are an AI language model assistant. Your task is 
-    to generate 3 different versions of the given user 
-    question to retrieve relevant documents from a vector  database. 
-    By generating multiple perspectives on the user question, 
-    your goal is to help the user overcome some of the limitations 
-    of distance-based similarity search. Provide these alternative 
-    questions separated by newlines. Original question: {question}""",
-)
+
 
 def demo_vectordb_multiquery_retriever(bedrock_runtime : str, model_id, model_kwargs, prompt):
 
@@ -148,7 +143,81 @@ def demo_vectordb_multiquery_retriever(bedrock_runtime : str, model_id, model_kw
 
     multiquery_retriever = MultiQueryRetriever.from_llm(retriever = retriever, llm = llm)
 
+    # Error since questions contain empty elements
     similar_docs = multiquery_retriever.get_relevant_documents(prompt)
+
+    print(f"Matches: {len(similar_docs)}")
+    for similar_doc in similar_docs:
+        print("---------------------------------")
+        print(f"{similar_doc.metadata}")
+        print(f"{similar_doc.page_content}")
+
+#
+# Output parser will split the LLM result into a list of queries
+class LineList(BaseModel):
+    # "lines" is the key (attribute name) of the parsed output
+    lines: List[str] = Field(description="Lines of text")
+
+
+class LineListOutputParser(PydanticOutputParser):
+    def __init__(self) -> None:
+        super().__init__(pydantic_object=LineList)
+
+    def parse(self, text: str) -> LineList:
+        lines = text.strip().split("\n")
+        #print(f"Lines: {lines}")
+        for line in lines:
+            if (len(line)==0):
+                lines.remove(line)
+            else:
+                print(f"Line: {line}")
+        #print(f"Lines: {lines}")
+        return LineList(lines=lines)
+
+QUERY_PROMPT = PromptTemplate(
+    input_variables=["question"],
+    template="""You are an AI language model assistant. Your task is 
+    to generate 3 different versions of the given user 
+    question to retrieve relevant documents from a vector  database. 
+    By generating multiple perspectives on the user question, 
+    your goal is to help the user overcome some of the limitations 
+    of distance-based similarity search. Provide these alternative 
+    questions separated by newlines. Original question: {question}""",
+)
+
+def demo_vectordb_multiquery_retriever_m2(bedrock_runtime : str, 
+                                          embedding_model_id = "amazon.titan-embed-text-v1", 
+                                          llm_model_id = "anthropic.claude-instant-v1", 
+                                          llm_model_kwargs = { "temperature": 0.0 }, prompt = None):
+
+    print("Call demo_vectordb_multiquery_retriever")
+
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = embedding_model_id
+    )
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
+    )
+
+    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+
+    retriever = vectordb.as_retriever()
+
+    # Create MultiQueryRetriever to perform Similarity Search
+
+    output_parser = LineListOutputParser()
+
+    llm_chain = LLMChain(llm = llm, prompt = QUERY_PROMPT, output_parser = output_parser)
+
+    multiquery_retriever = MultiQueryRetriever(
+        retriever = vectordb.as_retriever(), llm_chain = llm_chain, parser_key = "lines"
+    )  # "lines" is the key (attribute name) of the parsed output
+
+    similar_docs = multiquery_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
 
     print(f"Matches: {len(similar_docs)}")
     for similar_doc in similar_docs:
