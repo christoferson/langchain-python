@@ -55,8 +55,9 @@ def run_demo(session):
     #demo_vectordb_contextual_retriever(bedrock_runtime, prompt = prompt)
 
     # US Constitution
+    demo_chain(bedrock_runtime)
     #usc_load_embed_save(bedrock_runtime=bedrock_runtime)
-    usc_vectordb_contextual_retriever(bedrock_runtime, prompt = "What is the 1st Amendment?")
+    #usc_vectordb_contextual_retriever(bedrock_runtime, prompt = "What is the 1st Amendment?")
 
 
 
@@ -64,149 +65,16 @@ def setup_loggers():
     logging.basicConfig()
     logging.getLogger('langchain.retrievers.multi_query').setLevel(logging.INFO)
 
-def demo_load_embed_save(bedrock_runtime : str, model_id='amazon.titan-embed-text-v1'):
+def demo_chain(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, ):
 
-    print("Call demo_load_embed_save")
+    print("Call demo_chain")
 
-    document_loader = TextLoader("documents/demo.txt")
+    human_prompt = HumanMessagePromptTemplate.from_template("Tell me a trivia about {topic}")
 
-    data = document_loader.load()
-
-    text_splitter = CharacterTextSplitter(separator="\n\n", chunk_size=1000)
-
-    data_chunked = text_splitter.split_documents(data)
-    
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = model_id
-    )
-
-    vectordb = Chroma.from_documents(data_chunked, embeddings, persist_directory=CHROMA_DB_PATH)
-
-    vectordb.persist()
-
-    #result = embeddings.embed_documents([text.page_content for text in data_chunked])
-
-    #print(f"Embeddings.Length: {len(result)}")
-
-
-def demo_vectordb_similarity_search(bedrock_runtime : str, model_id, prompt):
-
-    print("Call demo_vectordb_similarity_search")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = model_id
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    similar_docs = vectordb.similarity_search(prompt, k=2)
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-def demo_vectordb_retriever(bedrock_runtime : str, model_id, prompt):
-
-    print("Call demo_vectordb_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = model_id
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    retriever = vectordb.as_retriever()
-
-    similar_docs = retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-
-
-def demo_vectordb_multiquery_retriever(bedrock_runtime : str, model_id, model_kwargs, prompt):
-
-    print("Call demo_vectordb_multiquery_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = "amazon.titan-embed-text-v1"
-    )
-
-    llm = BedrockChat(
-        client = bedrock_runtime,
-        model_id = "anthropic.claude-instant-v1",
-        model_kwargs = model_kwargs,
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    retriever = vectordb.as_retriever()
-
-    multiquery_retriever = MultiQueryRetriever.from_llm(retriever = retriever, llm = llm)
-
-    # Error since questions contain empty elements
-    similar_docs = multiquery_retriever.get_relevant_documents(prompt)
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-#
-# Output parser will split the LLM result into a list of queries
-class LineList(BaseModel):
-    # "lines" is the key (attribute name) of the parsed output
-    lines: List[str] = Field(description="Lines of text")
-
-
-class LineListOutputParser(PydanticOutputParser):
-    def __init__(self) -> None:
-        super().__init__(pydantic_object=LineList)
-
-    def parse(self, text: str) -> LineList:
-        lines = text.strip().split("\n")
-        #print(f"Lines: {lines}")
-        for line in lines:
-            if (len(line)==0):
-                lines.remove(line)
-            else:
-                print(f"Line: {line}")
-        #print(f"Lines: {lines}")
-        return LineList(lines=lines)
-
-QUERY_PROMPT = PromptTemplate(
-    input_variables=["question"],
-    template="""You are an AI language model assistant. Your task is 
-    to generate 3 different versions of the given user 
-    question to retrieve relevant documents from a vector  database. 
-    By generating multiple perspectives on the user question, 
-    your goal is to help the user overcome some of the limitations 
-    of distance-based similarity search. Provide these alternative 
-    questions separated by newlines. Original question: {question}""",
-)
-
-def demo_vectordb_multiquery_retriever_m2(bedrock_runtime : str, 
-                                          embedding_model_id = "amazon.titan-embed-text-v1", 
-                                          llm_model_id = "anthropic.claude-instant-v1", 
-                                          llm_model_kwargs = { "temperature": 0.0 }, 
-                                          prompt = None):
-
-    print("Call demo_vectordb_multiquery_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
+    chat_prompt_template = ChatPromptTemplate.from_messages([human_prompt])
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -214,64 +82,11 @@ def demo_vectordb_multiquery_retriever_m2(bedrock_runtime : str,
         model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+    llm_chain = LLMChain(llm=llm, prompt=chat_prompt_template)
 
-    retriever = vectordb.as_retriever()
+    result = llm_chain.run(topic = "Pluto")
 
-    # Create MultiQueryRetriever to perform Similarity Search
-
-    output_parser = LineListOutputParser()
-
-    llm_chain = LLMChain(llm = llm, prompt = QUERY_PROMPT, output_parser = output_parser)
-
-    multiquery_retriever = MultiQueryRetriever(
-        retriever = vectordb.as_retriever(), llm_chain = llm_chain, parser_key = "lines"
-    )  # "lines" is the key (attribute name) of the parsed output
-
-    similar_docs = multiquery_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-def demo_vectordb_contextual_retriever(bedrock_runtime : str, 
-                                          embedding_model_id = "amazon.titan-embed-text-v1", 
-                                          llm_model_id = "anthropic.claude-instant-v1", 
-                                          llm_model_kwargs = { "temperature": 0.0 }, 
-                                          prompt = None):
-
-    print("Call demo_vectordb_contextual_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
-
-    llm = BedrockChat(
-        client = bedrock_runtime,
-        model_id = llm_model_id,
-        model_kwargs = llm_model_kwargs,
-    )
-
-    vectordb = Chroma(embedding_function = embeddings, persist_directory = CHROMA_DB_PATH)
-
-    retriever = vectordb.as_retriever()
-
-    compressor = LLMChainExtractor.from_llm(llm)
-
-    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
-                                                           base_retriever=retriever)
-
-    similar_docs = compression_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
+    print(result)
 
 def usc_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
 
