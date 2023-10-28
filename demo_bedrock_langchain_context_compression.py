@@ -27,6 +27,8 @@ from langchain.chains import LLMChain
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
+USC_CHROMA_DB_PATH = "vectordb/chromadb/usc.db"
+
 def run_demo(session):
 
     bedrock = session.client('bedrock')
@@ -50,7 +52,9 @@ def run_demo(session):
     #demo_vectordb_retriever(bedrock_runtime, model_id, prompt)
     #demo_vectordb_multiquery_retriever(bedrock_runtime, "anthropic.claude-instant-v1", model_kwargs, prompt)
     #demo_vectordb_multiquery_retriever_m2(bedrock_runtime, prompt = prompt)
-    demo_vectordb_contextual_retriever(bedrock_runtime, prompt = prompt)
+    #demo_vectordb_contextual_retriever(bedrock_runtime, prompt = prompt)
+
+    usc_load_embed_save(bedrock_runtime=bedrock_runtime)
 
 
 def setup_loggers():
@@ -235,7 +239,7 @@ def demo_vectordb_contextual_retriever(bedrock_runtime : str,
                                           llm_model_kwargs = { "temperature": 0.0 }, 
                                           prompt = None):
 
-    print("Call demo_vectordb_multiquery_retriever")
+    print("Call demo_vectordb_contextual_retriever")
 
     embeddings = BedrockEmbeddings(
         client = bedrock_runtime,
@@ -248,7 +252,7 @@ def demo_vectordb_contextual_retriever(bedrock_runtime : str,
         model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+    vectordb = Chroma(embedding_function = embeddings, persist_directory = CHROMA_DB_PATH)
 
     retriever = vectordb.as_retriever()
 
@@ -257,10 +261,34 @@ def demo_vectordb_contextual_retriever(bedrock_runtime : str,
     compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
                                                            base_retriever=retriever)
 
-    similar_docs = compression_retriever.get_relevant_documents(prompt)
+    similar_docs = compression_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
 
     print(f"Matches: {len(similar_docs)}")
     for similar_doc in similar_docs:
         print("---------------------------------")
         print(f"{similar_doc.metadata}")
         print(f"{similar_doc.page_content}")
+
+
+def usc_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
+
+    print("Call usc_load_embed_save")
+
+    document_loader = TextLoader("documents/us_constitution.txt")
+
+    data = document_loader.load()
+
+    #text_splitter = CharacterTextSplitter(separator="\n\n", chunk_size=1000)
+    text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=500)
+
+    data_chunked = text_splitter.split_documents(data)
+    
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = embedding_model_id
+    )
+
+    vectordb = Chroma.from_documents(data_chunked, embeddings, persist_directory=USC_CHROMA_DB_PATH)
+
+    vectordb.persist()
+
