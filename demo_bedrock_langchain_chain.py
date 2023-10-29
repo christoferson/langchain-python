@@ -23,7 +23,7 @@ from langchain.output_parsers import PydanticOutputParser
 
 from typing import List
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, SimpleSequentialChain
+from langchain.chains import LLMChain, SimpleSequentialChain, SequentialChain
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
@@ -48,9 +48,34 @@ def run_demo(session):
 
     setup_loggers()
 
+    emmployee_review = """
+        "Employee Information:\n",
+        "Name: Joe Schmo\n",
+        "Position: Software Engineer\n",
+        "Date of Review: July 14, 2023\n",
+        "\n",
+        "Strengths:\n",
+        "Joe is a highly skilled software engineer with a deep understanding of programming languages, algorithms, and software development best practices. His technical expertise shines through in his ability to efficiently solve complex problems and deliver high-quality code.\n",
+        "\n",
+        "One of Joe's greatest strengths is his collaborative nature. He actively engages with cross-functional teams, contributing valuable insights and seeking input from others. His open-mindedness and willingness to learn from colleagues make him a true team player.\n",
+        "\n",
+        "Joe consistently demonstrates initiative and self-motivation. He takes the lead in seeking out new projects and challenges, and his proactive attitude has led to significant improvements in existing processes and systems. His dedication to self-improvement and growth is commendable.\n",
+        "\n",
+        "Another notable strength is Joe's adaptability. He has shown great flexibility in handling changing project requirements and learning new technologies. This adaptability allows him to seamlessly transition between different projects and tasks, making him a valuable asset to the team.\n",
+        "\n",
+        "Joe's problem-solving skills are exceptional. He approaches issues with a logical mindset and consistently finds effective solutions, often thinking outside the box. His ability to break down complex problems into manageable parts is key to his success in resolving issues efficiently.\n",
+        "\n",
+        "Weaknesses:\n",
+        "While Joe possesses numerous strengths, there are a few areas where he could benefit from improvement. One such area is time management. Occasionally, Joe struggles with effectively managing his time, resulting in missed deadlines or the need for additional support to complete tasks on time. Developing better prioritization and time management techniques would greatly enhance his efficiency.\n",
+        "\n",
+        "Another area for improvement is Joe's written communication skills. While he communicates well verbally, there have been instances where his written documentation lacked clarity, leading to confusion among team members. Focusing on enhancing his written communication abilities will help him effectively convey ideas and instructions.\n",
+        "\n",
+        "Additionally, Joe tends to take on too many responsibilities and hesitates to delegate tasks to others. This can result in an excessive workload and potential burnout. Encouraging him to delegate tasks appropriately will not only alleviate his own workload but also foster a more balanced and productive team environment.\n"
+    """
+
     #demo_chain(bedrock_runtime)
-    demo_chain_simple_sequential(bedrock_runtime)
-    #usc_vectordb_contextual_retriever(bedrock_runtime, prompt = "What is the 1st Amendment?")
+    #demo_chain_simple_sequential(bedrock_runtime)
+    demo_chain_sequential(bedrock_runtime, emmployee_review=emmployee_review)
 
 
 
@@ -109,18 +134,13 @@ def demo_chain_simple_sequential(bedrock_runtime : str,
     print(result)
 
 
-def usc_vectordb_contextual_retriever(bedrock_runtime : str, 
-                                          embedding_model_id = "amazon.titan-embed-text-v1", 
-                                          llm_model_id = "anthropic.claude-instant-v1", 
-                                          llm_model_kwargs = { "temperature": 0.0 }, 
-                                          prompt = None):
+def demo_chain_sequential(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            emmployee_review = ""):
 
-    print("Call usc_vectordb_contextual_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
+    print("Call demo_chain_simple_sequential")
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -128,21 +148,22 @@ def usc_vectordb_contextual_retriever(bedrock_runtime : str,
         model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma(embedding_function = embeddings, persist_directory = USC_CHROMA_DB_PATH)
+    prompt_1 = ChatPromptTemplate.from_template("Give a summary of this employee's performance \n {review}")
+    chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="review_summary")
 
-    retriever = vectordb.as_retriever()
+    prompt_2 = ChatPromptTemplate.from_template("Identify key employee weekneses in this review summary: \n {review_summary}.")
+    chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="weakneses")
 
-    compressor = LLMChainExtractor.from_llm(llm)
+    prompt_3 = ChatPromptTemplate.from_template("Create a personalized plan to help address and fix these weaknesses: \n {weakneses}.")
+    chain_3 = LLMChain(llm=llm, prompt=prompt_3, output_key="final_plan")
 
-    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
-                                                           base_retriever=retriever)
+    llm_chain = SequentialChain(chains=[chain_1, chain_2, chain_3], verbose=True, input_variables=["review"], 
+                                output_variables=["review_summary", "weakneses", "final_plan"])
 
-    similar_docs = compression_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
+    result = llm_chain(emmployee_review)
 
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
+    print(result["review_summary"])
+    print(result["weakneses"])
+    print(result["weakneses"])
 
         
