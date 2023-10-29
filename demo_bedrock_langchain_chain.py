@@ -23,7 +23,7 @@ from langchain.output_parsers import PydanticOutputParser
 
 from typing import List
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain.chains import LLMChain, SimpleSequentialChain
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
@@ -48,15 +48,8 @@ def run_demo(session):
 
     setup_loggers()
 
-    #demo_vectordb_similarity_search(bedrock_runtime, model_id, prompt)
-    #demo_vectordb_retriever(bedrock_runtime, model_id, prompt)
-    #demo_vectordb_multiquery_retriever(bedrock_runtime, "anthropic.claude-instant-v1", model_kwargs, prompt)
-    #demo_vectordb_multiquery_retriever_m2(bedrock_runtime, prompt = prompt)
-    #demo_vectordb_contextual_retriever(bedrock_runtime, prompt = prompt)
-
-    # US Constitution
-    demo_chain(bedrock_runtime)
-    #usc_load_embed_save(bedrock_runtime=bedrock_runtime)
+    #demo_chain(bedrock_runtime)
+    demo_chain_simple_sequential(bedrock_runtime)
     #usc_vectordb_contextual_retriever(bedrock_runtime, prompt = "What is the 1st Amendment?")
 
 
@@ -68,7 +61,8 @@ def setup_loggers():
 def demo_chain(bedrock_runtime : str, 
                             embedding_model_id = "amazon.titan-embed-text-v1", 
                             llm_model_id = "anthropic.claude-instant-v1", 
-                            llm_model_kwargs = { "temperature": 0.0 }, ):
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            prompt = "Pluto"):
 
     print("Call demo_chain")
 
@@ -84,31 +78,35 @@ def demo_chain(bedrock_runtime : str,
 
     llm_chain = LLMChain(llm=llm, prompt=chat_prompt_template)
 
-    result = llm_chain.run(topic = "Pluto")
+    result = llm_chain.run(topic = prompt)
 
     print(result)
 
-def usc_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
+def demo_chain_simple_sequential(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            prompt = "Cheesecake"):
 
-    print("Call usc_load_embed_save")
+    print("Call demo_chain_simple_sequential")
 
-    document_loader = TextLoader("documents/us_constitution.txt")
-
-    data = document_loader.load()
-
-    #text_splitter = CharacterTextSplitter(separator="\n\n", chunk_size=1000)
-    text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=500)
-
-    data_chunked = text_splitter.split_documents(data)
-    
-    embeddings = BedrockEmbeddings(
+    llm = BedrockChat(
         client = bedrock_runtime,
-        model_id = embedding_model_id
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma.from_documents(data_chunked, embeddings, persist_directory=USC_CHROMA_DB_PATH)
+    prompt_1 = ChatPromptTemplate.from_template("Give me a simple bullet point outline for a blog post on {topic}")
+    chain_1 = LLMChain(llm=llm, prompt=prompt_1)
 
-    vectordb.persist()
+    prompt_2 = ChatPromptTemplate.from_template("Write a blog post using this {outline}.")
+    chain_2 = LLMChain(llm=llm, prompt=prompt_2)
+
+    llm_chain = SimpleSequentialChain(chains=[chain_1, chain_2], verbose=True)
+
+    result = llm_chain.run(prompt)
+
+    print(result)
 
 
 def usc_vectordb_contextual_retriever(bedrock_runtime : str, 
