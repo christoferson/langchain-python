@@ -1,11 +1,12 @@
 # langchain-python
 
-Langchain examples in Python using AWS Bedrock LLM
+### Langchain examples in Python using AWS Bedrock LLM
 
 ##### Basic Examples
 
 <ol>
-<li>[demo_bedrock_langchain.py](demo_bedrock_langchain)</li>
+<li>[langchain](demo_bedrock_langchain.py)</li>
+<li>[langchain_chat](demo_bedrock_langchain_chat.py)</li>
 </ol>
 
 ##### Document Retrievers
@@ -13,10 +14,17 @@ Langchain examples in Python using AWS Bedrock LLM
 
 ##### Vector Store
 
+<ol>
+<li>[vector_store](demo_bedrock_langchain_vector_store.py)</li>
+</ol>
+
 ##### Document Transformation
 
 ##### LLM Chains
 
+<ol>
+<li>[langchain_chain](demo_bedrock_langchain_chain.py)</li>
+</ol>
 
 <hr/>
 
