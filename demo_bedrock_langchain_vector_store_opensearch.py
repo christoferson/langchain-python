@@ -15,8 +15,10 @@ from langchain.embeddings import BedrockEmbeddings
 
 from langchain.vectorstores import Chroma
 
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 from requests_aws4auth import AWS4Auth
+
+from langchain.vectorstores import OpenSearchVectorSearch
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
@@ -30,6 +32,7 @@ def run_demo(session):
     embedding_model_id = "amazon.titan-embed-text-v1"
 
     demo_access_opensearch(session)
+    #demo_access_opensearch_2(session, bedrock_runtime)
     #demo_load_embed_save(bedrock_runtime)
     prompt = "What is the origin of the name New York?"
     prompt = "Etymology New York"
@@ -66,9 +69,11 @@ def demo_access_opensearch(session):
     service = 'aoss'
     region = 'us-east-1'
     credentials = session.get_credentials()
-    awsauth = AWS4Auth(credentials.access_key, credentials.secret_key,
-                   region, service, session_token=credentials.token)
-    host = config.aws["opensearch_serverless_endpoint"] 
+    print(credentials.access_key)
+    #awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
+    host = config.aws["opensearch_serverless_endpoint"]
+    print(host)
     client = OpenSearch(
         hosts=[{'host': host, 'port': 443}],
         http_auth=awsauth,
@@ -78,12 +83,93 @@ def demo_access_opensearch(session):
         timeout=300
     )
 
+
+    query = {
+      "size": 20,
+      "fields": ["title", "plot"],
+      "_source": False,
+      "query": {
+        "knn": {
+          "v_title": {
+            "vector": "123",
+            "k": 1
+          }
+        }
+      }
+    }
+    
+    print (query)
+    
+    response = client.search(
+        body = query,
+        index = "bookinfo"
+    )
+
+    print (response)
+
     index_name = "bookinfo"
     if not client.indices.exists(index=index_name):
         client.indices.create(index=index_name, body=bookinfo_index_settings)
         print("index created")
     else:
         print("index already exist")
+
+def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1"):
+    
+    print("Call demo_access_opensearch_2")
+
+    ###
+    document_loader = TextLoader("documents/demo.txt")
+
+    data = document_loader.load()
+
+    text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=500)
+
+    data_chunked = text_splitter.split_documents(data)
+
+    print("Loaded documents")
+    ###
+
+    client = session.client('opensearchserverless')
+
+    service = 'aoss'
+    region = 'us-east-1'
+    credentials = session.get_credentials()
+    awsauth = AWS4Auth(credentials.access_key, credentials.secret_key,
+                   region, service, session_token=credentials.token)
+    host = config.aws["opensearch_serverless_endpoint"] 
+
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = embedding_model_id
+    )
+
+    print("Ready")
+
+    docsearch = OpenSearchVectorSearch.from_documents(
+        data_chunked,
+        embeddings,
+        opensearch_url=host,
+        http_auth=awsauth,
+        timeout=30,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        index_name="test-index-using-aoss",
+        engine="faiss",
+    )
+
+    print("Searching")
+
+    docs = docsearch.similarity_search(
+        "What is feature selection",
+        efficient_filter=filter,
+        k=200,
+    )
+
+
+
+    print(docs)
 
 def demo_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
 
