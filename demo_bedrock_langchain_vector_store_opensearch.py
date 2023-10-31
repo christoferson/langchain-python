@@ -31,7 +31,9 @@ def run_demo(session):
     llm_model_id = "anthropic.claude-instant-v1"
     embedding_model_id = "amazon.titan-embed-text-v1"
 
-    demo_access_opensearch(session)
+    #demo_boto3_opensearch(session)
+    #demo_access_opensearch(session)
+    demo_access_opensearch_1(session)
     #demo_access_opensearch_2(session, bedrock_runtime)
     #demo_load_embed_save(bedrock_runtime)
     prompt = "What is the origin of the name New York?"
@@ -60,20 +62,27 @@ bookinfo_index_settings = {
   }
 }
 
-def demo_access_opensearch(session):
-    print("Call demo_access_opensearch")
+def demo_boto3_opensearch(session):
+    print("Call demo_boto3_opensearch")
+
     client = session.client('opensearchserverless')
-    result = client.list_collections()
-    print(result)
+
+    print("\n\nList Collections")
+    result = client.list_collections( maxResults=5)
+    print(result['collectionSummaries'])
+
+
+def demo_access_opensearch(session):
+
+    print("Call demo_access_opensearch")
 
     service = 'aoss'
-    region = 'us-east-1'
+    region = config.aws["region_name"]
     credentials = session.get_credentials()
-    print(credentials.access_key)
     #awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
     awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
     host = config.aws["opensearch_serverless_endpoint"]
-    print(host)
+
     client = OpenSearch(
         hosts=[{'host': host, 'port': 443}],
         http_auth=awsauth,
@@ -106,6 +115,34 @@ def demo_access_opensearch(session):
     )
 
     print (response)
+
+#    index_name = "bookinfo"
+#    if not client.indices.exists(index=index_name):
+#        client.indices.create(index=index_name, body=bookinfo_index_settings)
+#        print("index created")
+#    else:
+#        print("index already exist")
+
+
+def demo_access_opensearch_1(session):
+
+    print("Call demo_access_opensearch_1")
+
+    service = 'aoss'
+    region = config.aws["region_name"]
+    credentials = session.get_credentials()
+    #awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
+    host = config.aws["opensearch_serverless_endpoint"]
+
+    client = OpenSearch(
+        hosts=[{'host': host, 'port': 443}],
+        http_auth=awsauth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        timeout=300
+    )
 
     index_name = "bookinfo"
     if not client.indices.exists(index=index_name):
