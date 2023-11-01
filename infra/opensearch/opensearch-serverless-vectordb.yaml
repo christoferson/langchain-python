@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Amazon OpenSearch Serverless - VectorDB"
+
+Parameters:
+
+  CollectionName:
+    Type: String
+    Description: Collection Name
+    Default: myvectordb
+    
+Resources:
+
+  SecurityNetworkPolicy:
+    Type: "AWS::OpenSearchServerless::SecurityPolicy"
+    Properties:
+      Name: !Sub "${CollectionName}-network-policy"
+      Type: network
+      Description: !Sub "Network policy for ${CollectionName} collection"
+      Policy: !Sub >-
+        [{"Rules":[{"ResourceType":"collection","Resource":["collection/${CollectionName}"]}, {"ResourceType":"dashboard","Resource":["collection/${CollectionName}"]}],"AllowFromPublic":true}]
+
+  SecurityEncryptionPolicy:
+    Type: "AWS::OpenSearchServerless::SecurityPolicy"
+    Properties:
+      Name: !Sub "${CollectionName}-encryption-policy"
+      Type: encryption
+      Description: !Sub "Encryption policy for ${CollectionName} collection"
+      Policy: !Sub >-
+        {"Rules":[{"ResourceType":"collection","Resource":["collection/${CollectionName}"]}],"AWSOwnedKey":true}
+
+  SecurityDataAccessPolicy:
+    Type: "AWS::OpenSearchServerless::AccessPolicy"
+    Properties:
+      Name: !Sub "${CollectionName}-access-policy"
+      Type: data
+      Description: !Sub "Access policy for ${CollectionName} collection"
+      Policy: !Sub >-
+        [{"Description":"Access for cfn user","Rules":[{"ResourceType":"index","Resource":["index/*/*"],"Permission":["aoss:*"]},
+        {"ResourceType":"collection","Resource":["collection/${CollectionName}"],"Permission":["aoss:*"]}],
+        "Principal":["arn:aws:iam::${AWS::AccountId}:user/admin"]}]
+        
+  Collection:
+    Type: "AWS::OpenSearchServerless::Collection"
+    DependsOn:
+      - SecurityNetworkPolicy
+      - SecurityEncryptionPolicy
+      - SecurityDataAccessPolicy
+    Properties:
+      Name: !Sub "${CollectionName}"
+      Type: VECTORSEARCH
+      Description: !Sub "VectorDBExample ${CollectionName}"
+
+Outputs:
+
+  CollectionEndpoint:
+    Value: !GetAtt Collection.CollectionEndpoint
+    
+  CollectionArn:
+    Value: !GetAtt Collection.Arn
