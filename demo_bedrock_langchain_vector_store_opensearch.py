@@ -1,5 +1,8 @@
 import config
 from time import sleep
+import random
+
+from opensearchpy import helpers
 
 from langchain.document_loaders import CSVLoader
 from langchain.document_loaders import BSHTMLLoader
@@ -39,6 +42,7 @@ def run_demo(session):
     #demo_access_opensearch_2(session, bedrock_runtime)
     #demo_access_opensearch_search(session)
     demo_access_opensearch_search_2(session)
+    #demo_access_opensearch_search_3(session)
     #demo_load_embed_save(bedrock_runtime)
 
 
@@ -312,6 +316,78 @@ def demo_access_opensearch_search_2(session):
         if client.indices.exists(index=index_name):
             client.indices.delete(index=index_name)
 
+def demo_access_opensearch_search_3(session):
+
+    print("Call demo_access_opensearch_search_3")
+
+    region = config.aws["opensearch_serverless_region"]
+    credentials = session.get_credentials()
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
+    host = config.aws["opensearch_serverless_endpoint"]
+
+    client = OpenSearch(
+        hosts=[{'host': host, 'port': 443}],
+        http_auth=awsauth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        timeout=300
+    )
+
+    index_name = "knn"
+    if not client.indices.exists(index=index_name):
+        client.indices.create(index=index_name, body={
+            "settings":{
+                "index.knn": True
+            },
+            "mappings":{
+                "properties": {
+                    "values": {
+                        "type": "knn_vector", 
+                        "dimension": 5
+                    },
+                }
+            }
+        })
+
+    sleep(1)
+
+    vectors = []
+    for i in range(10):
+        vec = []
+        for j in range(5): 
+            vec.append(round(random.uniform(0, 1), 2)) 
+    
+        vectors.append({
+            "_index": index_name,
+            "_id": i,
+            "values": vec,
+        })
+
+    helpers.bulk(client, vectors)
+
+    client.indices.refresh(index=index_name)
+
+    sleep(1)
+
+    try:
+        # search
+        vec = []
+        for j in range(dimensions):
+            vec.append(round(random.uniform(0, 1), 2))
+        print(f"Searching for {vec} ...")
+
+        search_query = {"query": {"knn": {"values": {"vector": vec, "k": 3}}}}
+        results = client.search(index=index_name, body=search_query)
+        for hit in results["hits"]["hits"]:
+            print(hit)
+
+        # delete the document
+        #client.delete(index=index_name, id="1") #(400, 'illegal_argument_exception', 'Invalid external document id:[1] for index type: [VECTORSEARCH].')
+    finally:
+        # delete the index
+        if client.indices.exists(index=index_name):
+            client.indices.delete(index=index_name)
 
 def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1"):
     
