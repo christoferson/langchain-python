@@ -1,4 +1,5 @@
 import config
+from time import sleep
 
 from langchain.document_loaders import CSVLoader
 from langchain.document_loaders import BSHTMLLoader
@@ -33,14 +34,13 @@ def run_demo(session):
 
     #demo_boto3_opensearch(session)
     #demo_access_opensearch(session)
-    demo_access_opensearch_1(session)
+    #demo_access_opensearch_1(session)
     #demo_boto3_bucket_delete(session)
     #demo_access_opensearch_2(session, bedrock_runtime)
+    #demo_access_opensearch_search(session)
+    demo_access_opensearch_search_2(session)
     #demo_load_embed_save(bedrock_runtime)
-    prompt = "What is the origin of the name New York?"
-    prompt = "Etymology New York"
-    #demo_vectordb_similarity_search(bedrock_runtime, model_id, prompt)
-    #demo_vectordb_retriever(bedrock_runtime, model_id, prompt)
+
 
 bookinfo_index_settings = {
   "mappings": {
@@ -61,6 +61,30 @@ bookinfo_index_settings = {
       } 
     }
   }
+}
+
+
+housing_index_settings = {
+    "settings": {
+      "index.knn": "true"
+   },
+   "mappings": {
+      "properties": {
+         "housing-vector": {
+            "type": "knn_vector",
+            "dimension": 3
+         },
+         "title": {
+            "type": "text"
+         },
+         "price": {
+            "type": "long"
+         },
+         "location": {
+            "type": "geo_point"
+         }
+      }
+   }
 }
 
 
@@ -171,6 +195,124 @@ def demo_access_opensearch_1(session):
     else:
         print("index already exist")
 
+
+def demo_access_opensearch_search(session):
+
+    print("Call demo_access_opensearch_search")
+
+    region = config.aws["opensearch_serverless_region"]
+    credentials = session.get_credentials()
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
+    host = config.aws["opensearch_serverless_endpoint"]
+
+    client = OpenSearch(
+        hosts=[{'host': host, 'port': 443}],
+        http_auth=awsauth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        timeout=300
+    )
+
+    #info = client.info()
+    #print(f"{info['version']['distribution']}: {info['version']['number']}")
+
+    index_name = "movies"
+    if not client.indices.exists(index=index_name):
+        client.indices.create(index=index_name)
+        #client.indices.create(index=index_name, body=bookinfo_index_settings)
+
+    try:
+        # index data
+        document = {"director": "Bennett Miller", "title": "Moneyball", "year": 2011}
+        #client.index(index=index_name, body=document, id="1") #'Document ID is not supported in create/index operation request'
+        client.index(index=index_name, body=document)
+
+        # wait for the document to index
+        sleep(1)
+
+        # search for the document
+        results = client.search(body={"query": {"match": {"director": "Bennett Miller"}}})
+        print(f"Search Results: {results}")
+        for hit in results["hits"]["hits"]:
+            print(hit["_source"])
+
+        # delete the document
+        #client.delete(index=index_name, id="1") #(400, 'illegal_argument_exception', 'Invalid external document id:[1] for index type: [VECTORSEARCH].')
+    finally:
+        # delete the index
+        if client.indices.exists(index=index_name):
+            client.indices.delete(index=index_name)
+
+
+def demo_access_opensearch_search_2(session):
+
+    print("Call demo_access_opensearch_search_2")
+
+    region = config.aws["opensearch_serverless_region"]
+    credentials = session.get_credentials()
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
+    host = config.aws["opensearch_serverless_endpoint"]
+
+    client = OpenSearch(
+        hosts=[{'host': host, 'port': 443}],
+        http_auth=awsauth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        timeout=300
+    )
+
+    index_name = "housing"
+    if not client.indices.exists(index=index_name):
+        client.indices.create(index=index_name, body=housing_index_settings)
+
+    sleep(1)
+
+    try:
+        document = {
+            "housing-vector": [
+                10,
+                20,
+                30
+            ],
+            "title": "2 bedroom in downtown Seattle",
+            "price": "2800",
+            "location": "47.71, 122.00"
+        }
+        indexed_document = client.index(index=index_name, body=document)
+        print(indexed_document)
+        print("----------------------------------------------------------")
+
+        # wait for the document to index
+        sleep(1)
+
+        # search for the document
+        search_query = {
+            "knn": {
+                "housing-vector": {
+                    "vector": [
+                        10,
+                        20,
+                        30
+                    ],
+                    "k": 5
+                }
+            }
+        }
+        results = client.search(index=index_name, size=5, body={"query": search_query })
+        print(f"Search Results: {results}")
+        for hit in results["hits"]["hits"]:
+            print(hit["_source"])
+
+        # delete the document
+        #client.delete(index=index_name, id="1") #(400, 'illegal_argument_exception', 'Invalid external document id:[1] for index type: [VECTORSEARCH].')
+    finally:
+        # delete the index
+        if client.indices.exists(index=index_name):
+            client.indices.delete(index=index_name)
+
+
 def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1"):
     
     print("Call demo_access_opensearch_2")
@@ -185,15 +327,14 @@ def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazo
     data_chunked = text_splitter.split_documents(data)
 
     print("Loaded documents")
+
     ###
 
     client = session.client('opensearchserverless')
 
-    service = 'aoss'
-    region = 'us-east-1'
+    region = config.aws["region_name"]
     credentials = session.get_credentials()
-    awsauth = AWS4Auth(credentials.access_key, credentials.secret_key,
-                   region, service, session_token=credentials.token)
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
     host = config.aws["opensearch_serverless_endpoint"] 
 
     embeddings = BedrockEmbeddings(
@@ -202,6 +343,8 @@ def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazo
     )
 
     print("Ready")
+
+    index_name = "bookinfo"
 
     docsearch = OpenSearchVectorSearch.from_documents(
         data_chunked,
@@ -212,11 +355,13 @@ def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazo
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection,
-        index_name="test-index-using-aoss",
-        engine="faiss",
+        index_name="index_name",
+        #engine="faiss",
     )
 
     print("Searching")
+
+    print("-----------------------------------")
 
     docs = docsearch.similarity_search(
         "What is feature selection",
@@ -224,9 +369,9 @@ def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazo
         k=200,
     )
 
-
-
     print(docs)
+
+    print("-----------------------------------")
 
 def demo_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
 
