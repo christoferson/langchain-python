@@ -34,6 +34,7 @@ def run_demo(session):
     #demo_boto3_opensearch(session)
     #demo_access_opensearch(session)
     demo_access_opensearch_1(session)
+    #demo_boto3_bucket_delete(session)
     #demo_access_opensearch_2(session, bedrock_runtime)
     #demo_load_embed_save(bedrock_runtime)
     prompt = "What is the origin of the name New York?"
@@ -61,6 +62,25 @@ bookinfo_index_settings = {
     }
   }
 }
+
+
+def demo_boto3_bucket_delete(session):
+    print("Call demo_boto3_bucket_delete")
+
+    BUCKETS = [
+        "kendra-basic-kendradatasourcebucket2-55ycr3ekk2lr",
+        "kendra-basic-kendradatasourcebucket-ubmynaqy7o3m",
+    ]
+
+    s3 = session.resource("s3")
+    for bucket_name in BUCKETS:
+        # For each bucket, create a resource object with boto3
+        bucket = s3.Bucket(bucket_name)
+        # Delete all of the objects in the bucket
+        bucket.object_versions.delete()
+
+        # Delete the bucket itself!
+        #bucket.delete()
 
 def demo_boto3_opensearch(session):
     print("Call demo_boto3_opensearch")
@@ -129,7 +149,7 @@ def demo_access_opensearch_1(session):
     print("Call demo_access_opensearch_1")
 
     service = 'aoss'
-    region = config.aws["region_name"]
+    region = config.aws["opensearch_serverless_region"]
     credentials = session.get_credentials()
     #awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
     awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
