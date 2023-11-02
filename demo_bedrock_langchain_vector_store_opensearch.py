@@ -1,6 +1,7 @@
 import config
 from time import sleep
 import random
+import json
 
 from opensearchpy import helpers
 
@@ -41,8 +42,9 @@ def run_demo(session):
     #demo_boto3_bucket_delete(session)
     #demo_access_opensearch_2(session, bedrock_runtime)
     #demo_access_opensearch_search(session)
-    demo_access_opensearch_search_2(session)
+    #demo_access_opensearch_search_2(session)
     #demo_access_opensearch_search_3(session)
+    demo_access_opensearch_search_4(session, bedrock_runtime, embedding_model_id)
     #demo_load_embed_save(bedrock_runtime)
 
 
@@ -388,6 +390,117 @@ def demo_access_opensearch_search_3(session):
         # delete the index
         if client.indices.exists(index=index_name):
             client.indices.delete(index=index_name)
+
+
+def demo_access_opensearch_search_4(session, bedrock_runtime, model_id='amazon.titan-embed-text-v1'):
+
+    print("Call demo_access_opensearch_search_4")
+
+    region = config.aws["opensearch_serverless_region"]
+    credentials = session.get_credentials()
+    awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
+    host = config.aws["opensearch_serverless_endpoint"]
+
+    client = OpenSearch(
+        hosts=[{'host': host, 'port': 443}],
+        http_auth=awsauth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+        timeout=300
+    )
+
+    index_name = "ix_documents"
+    if not client.indices.exists(index=index_name):
+        print(f"Creating index {index_name} ...")
+        settings = {
+            "settings": {
+                "index": {
+                    "knn": True,
+                }
+            },
+            "mappings": {
+                "properties": {
+                    "text": {"type": "text"},
+                    "vector_field": {
+                        "type": "knn_vector",
+                        "dimension": 1536, #must be the same size as Titan Embedding output 
+                    },
+                }
+            },
+        }
+        create_index_response = client.indices.create(index=index_name, body=settings, ignore=[400])
+        print(create_index_response)
+    else:
+        print(f"Index already created. {index_name}")
+
+    print("--------------------------------------------")
+
+    sleep(1)
+
+    ###
+
+    print("Calculating Embedding")
+
+    prompt = "sample text content"
+
+    request = {
+        "inputText": prompt
+    }
+
+    response = bedrock_runtime.invoke_model(modelId = model_id, body = json.dumps(request).encode('UTF-8'), 
+                                            accept="application/json", contentType="application/json")
+
+    response_body_json = json.loads(response["body"].read())
+
+    embedding = response_body_json["embedding"]
+
+    print(f"Created Embedding.{len(embedding)}")
+
+    sleep(1)
+
+    print("--------------------------------------------")
+    ###
+
+    try:
+
+        print("Inserting Document")
+        document = {
+            'vector_field' : embedding,
+            'text': prompt
+        }
+        # "failed to parse field [vector_field] of type [knn_vector] in document with id '3i6Ui4sBRPARBWLV3Ur1'. 
+        indexed_document = client.index(index=index_name, body=document)
+        print(indexed_document)
+        print("----------------------------------------------------------")
+
+        # wait for the document to index
+        sleep(2)
+
+        print("Searching Document")
+
+        # search for the document
+        search_query = {
+            "knn": {
+                "vector_field": {
+                    "vector": embedding,
+                    "k": 5
+                }
+            }
+        }
+        results = client.search(index=index_name, size=5, body={"query": search_query })
+        print(f"Search Results: {results}")
+        for hit in results["hits"]["hits"]:
+            print(hit["_source"])
+
+        # delete the document
+        #client.delete(index=index_name, id="1") #(400, 'illegal_argument_exception', 'Invalid external document id:[1] for index type: [VECTORSEARCH].')
+    finally:
+        # delete the index
+        if client.indices.exists(index=index_name):
+            client.indices.delete(index=index_name)
+
+
 
 def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1"):
     
