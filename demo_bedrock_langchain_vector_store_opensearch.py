@@ -36,6 +36,7 @@ def run_demo(session):
     llm_model_id = "anthropic.claude-instant-v1"
     embedding_model_id = "amazon.titan-embed-text-v1"
 
+    index_name = "ix_documents"
     #demo_boto3_opensearch(session)
     #demo_access_opensearch(session)
     #demo_access_opensearch_1(session)
@@ -44,7 +45,9 @@ def run_demo(session):
     #demo_access_opensearch_search(session)
     #demo_access_opensearch_search_2(session)
     #demo_access_opensearch_search_3(session)
-    demo_access_opensearch_search_4(session, bedrock_runtime, embedding_model_id)
+    #demo_access_opensearch_search_4(session, bedrock_runtime, embedding_model_id)
+
+    demo_access_opensearch_langchain(session, bedrock_runtime, embedding_model_id, index_name)
     #demo_load_embed_save(bedrock_runtime)
 
 
@@ -498,29 +501,25 @@ def demo_access_opensearch_search_4(session, bedrock_runtime, model_id='amazon.t
     finally:
         # delete the index
         if client.indices.exists(index=index_name):
-            client.indices.delete(index=index_name)
+            print(f"Deleting index. {index_name}")
+            #client.indices.delete(index=index_name)
 
 
 
-def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1"):
+def demo_access_opensearch_langchain(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1", index_name = "ix_documents"):
     
-    print("Call demo_access_opensearch_2")
+    print("Call demo_access_opensearch_langchain")
 
     ###
     document_loader = TextLoader("documents/demo.txt")
-
     data = document_loader.load()
-
     text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=500)
-
     data_chunked = text_splitter.split_documents(data)
 
-    print("Loaded documents")
+    print(f"Loaded documents. data_chunked={len(data_chunked)}")
 
     ###
-
-    client = session.client('opensearchserverless')
-
+    #client = session.client('opensearchserverless')
     region = config.aws["region_name"]
     credentials = session.get_credentials()
     awsauth = AWSV4SignerAuth(credentials, region, service="aoss")
@@ -531,36 +530,36 @@ def demo_access_opensearch_2(session, bedrock_runtime, embedding_model_id="amazo
         model_id = embedding_model_id
     )
 
-    print("Ready")
-
-    index_name = "bookinfo"
-
+    print(f"Ready. host={host}")
+    opensearch_url = f"https://{host}"
     docsearch = OpenSearchVectorSearch.from_documents(
         data_chunked,
         embeddings,
-        opensearch_url=host,
+        opensearch_url=opensearch_url,
         http_auth=awsauth,
         timeout=30,
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection,
-        index_name="index_name",
+        index_name=index_name,
         #engine="faiss",
     )
 
-    print("Searching")
+    print(f"Searching {index_name}")
 
     print("-----------------------------------")
 
     docs = docsearch.similarity_search(
-        "What is feature selection",
-        efficient_filter=filter,
-        k=200,
+        query="How did the name New York Came by?",
+        #efficient_filter=filter,
+        k=1, #k=1600, #k=1536,
     )
 
     print(docs)
 
     print("-----------------------------------")
+
+
 
 def demo_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
 
