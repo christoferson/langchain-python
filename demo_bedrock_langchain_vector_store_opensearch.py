@@ -506,7 +506,10 @@ def demo_access_opensearch_search_4(session, bedrock_runtime, model_id='amazon.t
 
 
 
-def demo_access_opensearch_langchain(session, bedrock_runtime, embedding_model_id="amazon.titan-embed-text-v1", index_name = "ix_documents"):
+def demo_access_opensearch_langchain(session, bedrock_runtime, 
+                                     embedding_model_id="amazon.titan-embed-text-v1", 
+                                     index_name = "ix_documents",
+                                     prompt="How did the name New York Came by?"):
     
     print("Call demo_access_opensearch_langchain")
 
@@ -545,17 +548,23 @@ def demo_access_opensearch_langchain(session, bedrock_runtime, embedding_model_i
         #engine="faiss",
     )
 
-    print(f"Searching {index_name}")
+    print(f"Searching {index_name}. Prompt={prompt}")
 
     print("-----------------------------------")
 
     docs = docsearch.similarity_search(
-        query="How did the name New York Came by?",
+        query=prompt,
         #efficient_filter=filter,
-        k=1, #k=1600, #k=1536,
+        k=3, #k=1600, #k=1536,
     )
 
-    print(docs)
+    print(f"Found Results: {len(docs)}")
+    for doc in docs:
+        print("---")
+        print(doc.page_content)
+        print("---")
+
+    #print(docs)
 
     print("-----------------------------------")
 
