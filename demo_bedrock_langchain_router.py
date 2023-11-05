@@ -23,7 +23,9 @@ from langchain.output_parsers import PydanticOutputParser
 
 from typing import List
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain.chains import LLMChain, SimpleSequentialChain, SequentialChain, RouterChain, MultiPromptChain
+from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMPLATE
+from langchain.chains.router.llm_router import LLMRouterChain, RouterOutputParser
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
@@ -48,15 +50,35 @@ def run_demo(session):
 
     setup_loggers()
 
-    #demo_vectordb_similarity_search(bedrock_runtime, model_id, prompt)
-    #demo_vectordb_retriever(bedrock_runtime, model_id, prompt)
-    #demo_vectordb_multiquery_retriever(bedrock_runtime, "anthropic.claude-instant-v1", model_kwargs, prompt)
-    #demo_vectordb_multiquery_retriever_m2(bedrock_runtime, prompt = prompt)
-    #demo_vectordb_contextual_retriever(bedrock_runtime, prompt = prompt)
+    emmployee_review = """
+        "Employee Information:\n",
+        "Name: Joe Schmo\n",
+        "Position: Software Engineer\n",
+        "Date of Review: July 14, 2023\n",
+        "\n",
+        "Strengths:\n",
+        "Joe is a highly skilled software engineer with a deep understanding of programming languages, algorithms, and software development best practices. His technical expertise shines through in his ability to efficiently solve complex problems and deliver high-quality code.\n",
+        "\n",
+        "One of Joe's greatest strengths is his collaborative nature. He actively engages with cross-functional teams, contributing valuable insights and seeking input from others. His open-mindedness and willingness to learn from colleagues make him a true team player.\n",
+        "\n",
+        "Joe consistently demonstrates initiative and self-motivation. He takes the lead in seeking out new projects and challenges, and his proactive attitude has led to significant improvements in existing processes and systems. His dedication to self-improvement and growth is commendable.\n",
+        "\n",
+        "Another notable strength is Joe's adaptability. He has shown great flexibility in handling changing project requirements and learning new technologies. This adaptability allows him to seamlessly transition between different projects and tasks, making him a valuable asset to the team.\n",
+        "\n",
+        "Joe's problem-solving skills are exceptional. He approaches issues with a logical mindset and consistently finds effective solutions, often thinking outside the box. His ability to break down complex problems into manageable parts is key to his success in resolving issues efficiently.\n",
+        "\n",
+        "Weaknesses:\n",
+        "While Joe possesses numerous strengths, there are a few areas where he could benefit from improvement. One such area is time management. Occasionally, Joe struggles with effectively managing his time, resulting in missed deadlines or the need for additional support to complete tasks on time. Developing better prioritization and time management techniques would greatly enhance his efficiency.\n",
+        "\n",
+        "Another area for improvement is Joe's written communication skills. While he communicates well verbally, there have been instances where his written documentation lacked clarity, leading to confusion among team members. Focusing on enhancing his written communication abilities will help him effectively convey ideas and instructions.\n",
+        "\n",
+        "Additionally, Joe tends to take on too many responsibilities and hesitates to delegate tasks to others. This can result in an excessive workload and potential burnout. Encouraging him to delegate tasks appropriately will not only alleviate his own workload but also foster a more balanced and productive team environment.\n"
+    """
 
-    # US Constitution
-    #usc_load_embed_save(bedrock_runtime=bedrock_runtime)
-    usc_vectordb_contextual_retriever(bedrock_runtime, prompt = "What is the 1st Amendment?")
+    #demo_chain(bedrock_runtime)
+    #demo_chain_simple_sequential(bedrock_runtime)
+    #demo_chain_sequential(bedrock_runtime, emmployee_review=emmployee_review)
+    demo_chain_router(bedrock_runtime, emmployee_review=emmployee_review)
 
 
 
@@ -64,149 +86,17 @@ def setup_loggers():
     logging.basicConfig()
     logging.getLogger('langchain.retrievers.multi_query').setLevel(logging.INFO)
 
-def demo_load_embed_save(bedrock_runtime : str, model_id='amazon.titan-embed-text-v1'):
+def demo_chain(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            prompt = "Pluto"):
 
-    print("Call demo_load_embed_save")
+    print("Call demo_chain")
 
-    document_loader = TextLoader("documents/demo.txt")
+    human_prompt = HumanMessagePromptTemplate.from_template("Tell me a trivia about {topic}")
 
-    data = document_loader.load()
-
-    text_splitter = CharacterTextSplitter(separator="\n\n", chunk_size=1000)
-
-    data_chunked = text_splitter.split_documents(data)
-    
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = model_id
-    )
-
-    vectordb = Chroma.from_documents(data_chunked, embeddings, persist_directory=CHROMA_DB_PATH)
-
-    vectordb.persist()
-
-    #result = embeddings.embed_documents([text.page_content for text in data_chunked])
-
-    #print(f"Embeddings.Length: {len(result)}")
-
-
-def demo_vectordb_similarity_search(bedrock_runtime : str, model_id, prompt):
-
-    print("Call demo_vectordb_similarity_search")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = model_id
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    similar_docs = vectordb.similarity_search(prompt, k=2)
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-def demo_vectordb_retriever(bedrock_runtime : str, model_id, prompt):
-
-    print("Call demo_vectordb_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = model_id
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    retriever = vectordb.as_retriever()
-
-    similar_docs = retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-
-
-def demo_vectordb_multiquery_retriever(bedrock_runtime : str, model_id, model_kwargs, prompt):
-
-    print("Call demo_vectordb_multiquery_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = "amazon.titan-embed-text-v1"
-    )
-
-    llm = BedrockChat(
-        client = bedrock_runtime,
-        model_id = "anthropic.claude-instant-v1",
-        model_kwargs = model_kwargs,
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    retriever = vectordb.as_retriever()
-
-    multiquery_retriever = MultiQueryRetriever.from_llm(retriever = retriever, llm = llm)
-
-    # Error since questions contain empty elements
-    similar_docs = multiquery_retriever.get_relevant_documents(prompt)
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-#
-# Output parser will split the LLM result into a list of queries
-class LineList(BaseModel):
-    # "lines" is the key (attribute name) of the parsed output
-    lines: List[str] = Field(description="Lines of text")
-
-
-class LineListOutputParser(PydanticOutputParser):
-    def __init__(self) -> None:
-        super().__init__(pydantic_object=LineList)
-
-    def parse(self, text: str) -> LineList:
-        lines = text.strip().split("\n")
-        #print(f"Lines: {lines}")
-        for line in lines:
-            if (len(line)==0):
-                lines.remove(line)
-            else:
-                print(f"Line: {line}")
-        #print(f"Lines: {lines}")
-        return LineList(lines=lines)
-
-QUERY_PROMPT = PromptTemplate(
-    input_variables=["question"],
-    template="""You are an AI language model assistant. Your task is 
-    to generate 3 different versions of the given user 
-    question to retrieve relevant documents from a vector  database. 
-    By generating multiple perspectives on the user question, 
-    your goal is to help the user overcome some of the limitations 
-    of distance-based similarity search. Provide these alternative 
-    questions separated by newlines. Original question: {question}""",
-)
-
-def demo_vectordb_multiquery_retriever_m2(bedrock_runtime : str, 
-                                          embedding_model_id = "amazon.titan-embed-text-v1", 
-                                          llm_model_id = "anthropic.claude-instant-v1", 
-                                          llm_model_kwargs = { "temperature": 0.0 }, 
-                                          prompt = None):
-
-    print("Call demo_vectordb_multiquery_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
+    chat_prompt_template = ChatPromptTemplate.from_messages([human_prompt])
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -214,40 +104,19 @@ def demo_vectordb_multiquery_retriever_m2(bedrock_runtime : str,
         model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+    llm_chain = LLMChain(llm=llm, prompt=chat_prompt_template)
 
-    retriever = vectordb.as_retriever()
+    result = llm_chain.run(topic = prompt)
 
-    # Create MultiQueryRetriever to perform Similarity Search
+    print(result)
 
-    output_parser = LineListOutputParser()
+def demo_chain_simple_sequential(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            prompt = "Cheesecake"):
 
-    llm_chain = LLMChain(llm = llm, prompt = QUERY_PROMPT, output_parser = output_parser)
-
-    multiquery_retriever = MultiQueryRetriever(
-        retriever = vectordb.as_retriever(), llm_chain = llm_chain, parser_key = "lines"
-    )  # "lines" is the key (attribute name) of the parsed output
-
-    similar_docs = multiquery_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
-
-def demo_vectordb_contextual_retriever(bedrock_runtime : str, 
-                                          embedding_model_id = "amazon.titan-embed-text-v1", 
-                                          llm_model_id = "anthropic.claude-instant-v1", 
-                                          llm_model_kwargs = { "temperature": 0.0 }, 
-                                          prompt = None):
-
-    print("Call demo_vectordb_contextual_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
+    print("Call demo_chain_simple_sequential")
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -255,59 +124,26 @@ def demo_vectordb_contextual_retriever(bedrock_runtime : str,
         model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma(embedding_function = embeddings, persist_directory = CHROMA_DB_PATH)
+    prompt_1 = ChatPromptTemplate.from_template("Give me a simple bullet point outline for a blog post on {topic}")
+    chain_1 = LLMChain(llm=llm, prompt=prompt_1)
 
-    retriever = vectordb.as_retriever()
+    prompt_2 = ChatPromptTemplate.from_template("Write a blog post using this {outline}.")
+    chain_2 = LLMChain(llm=llm, prompt=prompt_2)
 
-    compressor = LLMChainExtractor.from_llm(llm)
+    llm_chain = SimpleSequentialChain(chains=[chain_1, chain_2], verbose=True)
 
-    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
-                                                           base_retriever=retriever)
+    result = llm_chain.run(prompt)
 
-    similar_docs = compression_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
-
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
+    print(result)
 
 
-def usc_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-embed-text-v1'):
+def demo_chain_sequential(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            emmployee_review = ""):
 
-    print("Call usc_load_embed_save")
-
-    document_loader = TextLoader("documents/us_constitution.txt")
-
-    data = document_loader.load()
-
-    #text_splitter = CharacterTextSplitter(separator="\n\n", chunk_size=1000)
-    text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=500)
-
-    data_chunked = text_splitter.split_documents(data)
-    
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
-
-    vectordb = Chroma.from_documents(data_chunked, embeddings, persist_directory=USC_CHROMA_DB_PATH)
-
-    vectordb.persist()
-
-
-def usc_vectordb_contextual_retriever(bedrock_runtime : str, 
-                                          embedding_model_id = "amazon.titan-embed-text-v1", 
-                                          llm_model_id = "anthropic.claude-instant-v1", 
-                                          llm_model_kwargs = { "temperature": 0.0 }, 
-                                          prompt = None):
-
-    print("Call usc_vectordb_contextual_retriever")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
+    print("Call demo_chain_simple_sequential")
 
     llm = BedrockChat(
         client = bedrock_runtime,
@@ -315,21 +151,86 @@ def usc_vectordb_contextual_retriever(bedrock_runtime : str,
         model_kwargs = llm_model_kwargs,
     )
 
-    vectordb = Chroma(embedding_function = embeddings, persist_directory = USC_CHROMA_DB_PATH)
+    prompt_1 = ChatPromptTemplate.from_template("Give a summary of this employee's performance \n {review}")
+    chain_1 = LLMChain(llm=llm, prompt=prompt_1, output_key="review_summary")
 
-    retriever = vectordb.as_retriever()
+    prompt_2 = ChatPromptTemplate.from_template("Identify key employee weekneses in this review summary: \n {review_summary}.")
+    chain_2 = LLMChain(llm=llm, prompt=prompt_2, output_key="weakneses")
 
-    compressor = LLMChainExtractor.from_llm(llm)
+    prompt_3 = ChatPromptTemplate.from_template("Create a personalized plan to help address and fix these weaknesses: \n {weakneses}.")
+    chain_3 = LLMChain(llm=llm, prompt=prompt_3, output_key="final_plan")
 
-    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
-                                                           base_retriever=retriever)
+    llm_chain = SequentialChain(chains=[chain_1, chain_2, chain_3], verbose=True, input_variables=["review"], 
+                                output_variables=["review_summary", "weakneses", "final_plan"])
 
-    similar_docs = compression_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
+    result = llm_chain(emmployee_review)
 
-    print(f"Matches: {len(similar_docs)}")
-    for similar_doc in similar_docs:
-        print("---------------------------------")
-        print(f"{similar_doc.metadata}")
-        print(f"{similar_doc.page_content}")
+    print(result["review_summary"])
+    print(result["weakneses"])
+    print(result["weakneses"])
 
-        
+
+def demo_chain_router(bedrock_runtime : str, 
+                            embedding_model_id = "amazon.titan-embed-text-v1", 
+                            llm_model_id = "anthropic.claude-instant-v1", 
+                            llm_model_kwargs = { "temperature": 0.0 }, 
+                            emmployee_review = ""):
+
+    print("Call demo_chain_router")
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
+    )
+
+    beginner_template = """You are a physics teacher who is really focused on begginers and explaining complex concepts
+        in simple to understand terms. You assume no prior knowledge. Here is your question:\n{input}"""
+
+    advanced_template = """You are a physics proffessor who explains physics topics o advanced audience members.
+        You can assume anyone you answer has a PhD in Physics. Here is your question:\n{input}"""
+
+    prompt_info_list = [
+        {
+            "name": "beginner physics",
+            "description": "Answers basic physics questions",
+            "template" : beginner_template
+        },
+        {
+            "name": "advanced physics",
+            "description": "Answers advance physics questions",
+            "template" : advanced_template
+        }
+    ]
+
+    destination_chains = {}
+    for prompt_info in prompt_info_list:
+        name = prompt_info["name"]
+        prompt = ChatPromptTemplate.from_template(template=prompt_info["template"])
+        chain = LLMChain(llm=llm,prompt=prompt)
+        destination_chains[name] = chain
+
+    default_prompt = ChatPromptTemplate.from_template("{input}")
+    default_chain = LLMChain(llm=llm,prompt=default_prompt)
+
+    destinations = [f"{p['name']}:{p['description']}" for p in prompt_info_list]
+    destinations_str = "\n".join(destinations)
+
+    router_template = MULTI_PROMPT_ROUTER_TEMPLATE.format(destinations=destinations_str)
+
+    router_prompt = PromptTemplate(template=router_template, input_variables=['input'], output_parser=RouterOutputParser())
+
+    router_chain = LLMRouterChain.from_llm(llm, router_prompt)
+
+    llm_chain = MultiPromptChain(router_chain=router_chain, destination_chains=destination_chains,default_chain=default_chain,verbose=True)
+
+    result = llm_chain.run("How does magnet work?")
+    print(result)
+
+    #result = llm_chain.run("Please explain Feynman Diagrams?")
+
+    #print(result["review_summary"])
+    #print(result["weakneses"])
+    #print(result["weakneses"])
+
+   
