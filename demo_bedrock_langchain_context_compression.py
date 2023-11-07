@@ -54,7 +54,10 @@ def run_demo(session):
     #demo_vectordb_multiquery_retriever_m2(bedrock_runtime, prompt = prompt)
     #demo_vectordb_contextual_retriever(bedrock_runtime, prompt = prompt)
 
-    usc_load_embed_save(bedrock_runtime=bedrock_runtime)
+    # US Constitution
+    #usc_load_embed_save(bedrock_runtime=bedrock_runtime)
+    usc_vectordb_contextual_retriever(bedrock_runtime, prompt = "What is the 1st Amendment?")
+
 
 
 def setup_loggers():
@@ -292,3 +295,41 @@ def usc_load_embed_save(bedrock_runtime : str, embedding_model_id='amazon.titan-
 
     vectordb.persist()
 
+
+def usc_vectordb_contextual_retriever(bedrock_runtime : str, 
+                                          embedding_model_id = "amazon.titan-embed-text-v1", 
+                                          llm_model_id = "anthropic.claude-instant-v1", 
+                                          llm_model_kwargs = { "temperature": 0.0 }, 
+                                          prompt = None):
+
+    print("Call usc_vectordb_contextual_retriever")
+
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = embedding_model_id
+    )
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
+    )
+
+    vectordb = Chroma(embedding_function = embeddings, persist_directory = USC_CHROMA_DB_PATH)
+
+    retriever = vectordb.as_retriever()
+
+    compressor = LLMChainExtractor.from_llm(llm)
+
+    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor,
+                                                           base_retriever=retriever)
+
+    similar_docs = compression_retriever.get_relevant_documents(prompt, kwargs={ "k": 2 })
+
+    print(f"Matches: {len(similar_docs)}")
+    for similar_doc in similar_docs:
+        print("---------------------------------")
+        print(f"{similar_doc.metadata}")
+        print(f"{similar_doc.page_content}")
+
+        
