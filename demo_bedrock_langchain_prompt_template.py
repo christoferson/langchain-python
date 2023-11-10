@@ -5,7 +5,7 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 
 from langchain.cache import InMemoryCache
 
-from langchain import PromptTemplate
+from langchain.prompts import PromptTemplate
 
 import json
 
