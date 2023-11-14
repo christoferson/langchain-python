@@ -83,7 +83,7 @@ def setup_loggers():
     logging.basicConfig()
     logging.getLogger('langchain.retrievers.multi_query').setLevel(logging.INFO)
 
-def demo_chain(bedrock_runtime : str, 
+def demo_chain(bedrock_runtime, 
                             embedding_model_id = "amazon.titan-embed-text-v1", 
                             llm_model_id = "anthropic.claude-instant-v1", 
                             llm_model_kwargs = { "temperature": 0.0 }, 
