@@ -1,4 +1,9 @@
 from langchain.llms import Bedrock
+from langchain.chat_models import BedrockChat
+
+from langchain.prompts import PromptTemplate
+
+from langchain.schema.output_parser import StrOutputParser
 
 import json
 
@@ -16,7 +21,8 @@ def run_demo(session):
 
     #demo_llm(bedrock_runtime, model_id, model_kwargs, prompt)
     #demo_llm_predict(bedrock_runtime, model_id, model_kwargs, prompt)
-    demo_llm_generate(bedrock_runtime, model_id, model_kwargs, prompts)
+    #demo_llm_generate(bedrock_runtime, model_id, model_kwargs, prompts)
+    demo_llm_chain(bedrock_runtime, model_id, model_kwargs, prompt)
 
 
 def demo_llm(bedrock_runtime, model_id, model_kwargs, prompt):
@@ -67,3 +73,21 @@ def demo_llm_generate(bedrock_runtime, model_id, model_kwargs, prompts):
         print("")
 
     
+def demo_llm_chain(bedrock_runtime, model_id, model_kwargs, prompt):
+
+    print("Call demo_llm_chain")
+
+    prompt_template = PromptTemplate(input_variables = [], template = prompt)
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = model_id,
+        model_kwargs = model_kwargs,
+    )
+
+    chain = prompt_template | llm | StrOutputParser()
+
+    output = chain.invoke({"foo": "bears"})
+
+    #print(output.schema())
+    print(output)
