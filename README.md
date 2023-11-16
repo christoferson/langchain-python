@@ -30,6 +30,13 @@
 
 #### Python Package Installation
 
+pip install --upgrade <package-name>
+
+##### Pydantic
+
+pip list | grep langchain
+pip list | grep pydantic
+
 ##### Document Loader / Retriever
 
 pip install pypdf
