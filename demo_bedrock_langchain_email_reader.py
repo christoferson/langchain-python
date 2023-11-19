@@ -9,7 +9,7 @@ from langchain.embeddings import BedrockEmbeddings
 from langchain.chat_models import BedrockChat
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
-from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain
+from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain, SequentialChain
 
 from langchain.text_splitter import CharacterTextSplitter
 
@@ -30,17 +30,26 @@ def run_demo(session):
     model_id = "anthropic.claude-instant-v1"
     model_kwargs = { "temperature": 0.0, 'max_tokens_to_sample': 200 }
 
+    email_contents = open('documents/customer_email_spanish.txt', encoding="utf-8").read()
+    #email_contents = open('documents/customer_email_japanese.txt', encoding="utf-8").read()
+
+    #print(email_contents)
+    #print("*****")
+
     #demo_langchain_qa_chain(bedrock_runtime)
-    demo_langchain_qa_chain_with_sources(bedrock_runtime)
+    demo_read_translate_email(bedrock_runtime, email_contents=email_contents, output_language="Japanese", 
+                              llm_model_kwargs = { "temperature": 0.0 })
 
 
 
-def demo_langchain_qa_chain(bedrock_runtime, 
+def demo_read_translate_email(bedrock_runtime, 
                                 embedding_model_id : str = "amazon.titan-embed-text-v1", 
                                 llm_model_id : str = "anthropic.claude-instant-v1", 
-                                llm_model_kwargs : dict = { "temperature": 0.0 }, ):
+                                llm_model_kwargs : dict = { "temperature": 0.0 }, 
+                                email_contents : str = "Sample Email Content",
+                                output_language : str = "English"):
 
-    print("Call demo_langchain_qa_chain")
+    print("Call demo_read_translate_email")
 
     embeddings = BedrockEmbeddings(
         client = bedrock_runtime,
@@ -52,48 +61,37 @@ def demo_langchain_qa_chain(bedrock_runtime,
         model_id = llm_model_id,
         model_kwargs = llm_model_kwargs,
     )
+    
+    # Detect Language
+    template1 = "Return the language this email is written in:\n{email}.\nReturn only the language it was written in."
+    prompt1 = ChatPromptTemplate.from_template(template1)
+    chain_1 = LLMChain(llm=llm, prompt=prompt1, output_key="language")
+    
+    # Translate from detected language to English
+    template2 = "Translate this email from {language} to " + output_language + ". Here is the email:\n" + email_contents
+    prompt2 = ChatPromptTemplate.from_template(template2)
+    chain_2 = LLMChain(llm=llm, prompt=prompt2, output_key="translated_email")
+    
+    # Return Summary AND the Translated Email
+    template3 = "Create a short summary of this email in " + output_language + ":\n{translated_email}"
+    prompt3 = ChatPromptTemplate.from_template(template3)
+    chain_3 = LLMChain(llm=llm, prompt=prompt3, output_key="summary")
+    
+    seq_chain = SequentialChain(chains=[chain_1,chain_2,chain_3],
+                            input_variables=['email'],
+                            output_variables=['language','translated_email','summary'],
+                            verbose=True)
 
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    chain = load_qa_chain(llm, chain_type="stuff")
-
-    question = "What is the origin of the name New York?"
-
-    similar_docs = vectordb.similarity_search(question, k=2)
-    print(similar_docs)
-    result = chain.run(input_documents = similar_docs, question = question)
-
-    print("*****")
-    print(result)
-
-
-def demo_langchain_qa_chain_with_sources(bedrock_runtime, 
-                                embedding_model_id : str = "amazon.titan-embed-text-v1", 
-                                llm_model_id : str = "anthropic.claude-instant-v1", 
-                                llm_model_kwargs : dict = { "temperature": 0.0 }, ):
-
-    print("Call demo_langchain_qa_chain_with_sources")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
-
-    llm = BedrockChat(
-        client = bedrock_runtime,
-        model_id = llm_model_id,
-        model_kwargs = llm_model_kwargs,
-    )
-
-    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
-
-    chain = load_qa_with_sources_chain(llm, chain_type="stuff")
-
-    question = "What is the origin of the name New York?"
-
-    similar_docs = vectordb.similarity_search(question, k=2)
-    print(similar_docs)
-    result = chain.run(input_documents = similar_docs, question = question)
+    result = seq_chain(email_contents)
 
     print("*****")
-    print(result)
+    print(result.keys())
+
+    print("*****")
+    print(result["language"])
+
+    print("*****")
+    print(result["translated_email"])
+
+    print("*****")
+    print(result["summary"])
