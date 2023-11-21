@@ -28,9 +28,15 @@
 
 <hr/>
 
+#### Freeze
+
+pip freeze > requirements.txt
+
 #### Python Package Installation
 
 pip install --upgrade <package-name>
+
+pip install --upgrade langchain
 
 ##### Pydantic
 
@@ -47,6 +53,9 @@ pip install tiktoken
 
 pip install chromadb
 
+##### Agents - SerpApi
+
+pip install google-search-results
 
 ##### OpenSearch
 
