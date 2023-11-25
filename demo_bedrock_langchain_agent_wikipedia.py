@@ -16,11 +16,13 @@ from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain, Se
 
 from langchain.text_splitter import CharacterTextSplitter
 
-
 from langchain.chains.question_answering import load_qa_chain
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 
 from langchain.agents import load_tools, initialize_agent, AgentType
+
+from langchain.tools import WikipediaQueryRun
+from langchain.utilities import WikipediaAPIWrapper
 
 def run_demo(session):
 
@@ -28,26 +30,19 @@ def run_demo(session):
 
     bedrock_runtime = session.client('bedrock-runtime', region_name="us-east-1")
 
-    model_id = "anthropic.claude-v1"
-    model_id = "anthropic.claude-v2"
     model_id = "anthropic.claude-instant-v1"
     model_kwargs = { "temperature": 0.0, 'max_tokens_to_sample': 200 }
 
-    serpapi_api_key = config.serpapi["api_key"]
-    # Set SerpApi ApiKey
-    os.environ["SERPAPI_API_KEY"] = serpapi_api_key
-
-    #demo_agents_serpapi(bedrock_runtime, prompt="What is the temperature in Tokyo today? What is the temperature multiplied by 5?")
-    demo_agents_serpapi(bedrock_runtime, prompt="When was Albert Einstein born? What is the year multiplied by 5?")
+    demo_agents_wikipedia_connect(bedrock_runtime, prompt="When was Albert Einstein born? What is the year multiplied by 5?")
 
 
-def demo_agents_serpapi(bedrock_runtime, 
+def demo_agents_wikipedia_connect(bedrock_runtime, 
                         embedding_model_id : str = "amazon.titan-embed-text-v1", 
                         llm_model_id : str = "anthropic.claude-instant-v1", 
                         llm_model_kwargs : dict = { "temperature": 0.0 },
                         prompt = ""):
 
-    print("Call demo_agents_serpapi")
+    print("Call demo_agents_wikipedia_connect")
 
     embeddings = BedrockEmbeddings(
         client = bedrock_runtime,
@@ -60,10 +55,16 @@ def demo_agents_serpapi(bedrock_runtime,
         model_kwargs = llm_model_kwargs,
     )
 
-    tools = load_tools(['llm-math'], llm=llm) #tools = load_tools(['serpapi', 'llm-math'], llm=llm)
+    wikipedia = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
 
-    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True)
-
-    result = agent.run(prompt)
+    result = wikipedia.run("HUNTER X HUNTER")
 
     print(result)
+
+    #tools = load_tools(['llm-math'], llm=llm) #tools = load_tools(['serpapi', 'llm-math'], llm=llm)
+
+    #agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True)
+
+    #result = agent.run(prompt)
+
+    #print(result)
