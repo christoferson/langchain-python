@@ -244,6 +244,86 @@ def demo_langchain_retrieval_qa_chain_2(bedrock_runtime,
     vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
     retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 3}) #search_kwargs.k defines number of ducuments to search
 
+    qa = RetrievalQA.from_chain_type(llm = llm, 
+                                 chain_type = "stuff", 
+                                 retriever = retriever, 
+                                 chain_type_kwargs = chain_type_kwargs, 
+                                 return_source_documents = False)
+    
+    # 4. Invoke
+
+    tools = [
+        Tool(
+            name="newyorktool",
+            func=qa.run,
+            description="Use when asked about New York."
+        ),
+    ]
+
+    chat_agent = initialize_agent(
+        tools,
+        llm=llm,
+        agent = "zero-shot-react-description",
+        verbose=True,
+        system_message="You are a kind assistant. Provide the answer in Japanese",
+        max_iterations = 2,
+    )
+
+    result = chat_agent.run(query)
+    print(result)
+
+
+def demo_langchain_retrieval_qa_chain_3(bedrock_runtime, 
+                        embedding_model_id : str = "amazon.titan-embed-text-v1", 
+                        llm_model_id : str = "anthropic.claude-instant-v1", 
+                        llm_model_kwargs : dict = { "temperature": 0.0 },
+                        query : str = ""):
+
+    print(f"Call demo_langchain_retrieval_qa_chain llm_model_id={llm_model_id} ")
+
+    # 1. Create Prompt Template for Claude
+
+    prompt_template = """
+    The following is a friendly conversation between a human and an AI.
+    The AI is talkative and provides lots of specific details from its context. If the AI does not know
+    the answer to a question, it truthfully says it does not know.
+
+    Current conversation:
+    <conversation_history>
+    {context}
+    </conversation_history>
+
+    Human:
+    <human_reply>
+    {question}
+    </human_reply>
+
+    Assistant:
+    """
+
+    PROMPT = PromptTemplate(
+        template=prompt_template, input_variables=['context', 'question']
+    )
+
+    # 2. Instantiate Claude Bedrock
+
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = embedding_model_id
+    )
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
+    )
+
+    # 3. Create RetrievalQA
+
+    chain_type_kwargs = {"prompt": PROMPT}
+    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+    retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 3}) #search_kwargs.k defines number of ducuments to search
+
     # Keep track of questions & Answers
     memory = ConversationBufferMemory(ai_prefix="Assistant")
 
