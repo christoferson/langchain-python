@@ -49,7 +49,8 @@ def run_demo(session):
     #query = "How did New York get it's name?" # Infinite Loop
     query = "When did New York get it's name?"
     #demo_langchain_retrieval_qa_chain_2(bedrock_runtime, llm_model_id="anthropic.claude-v2", query=query)
-    demo_langchain_converse_retrieval_chain_1(bedrock_runtime, llm_model_id="anthropic.claude-v2", query=query)
+    demo_langchain_retrieval_qa_chain_4(bedrock_runtime, llm_model_id="anthropic.claude-v2", query=query)
+    #demo_langchain_converse_retrieval_chain_1(bedrock_runtime, llm_model_id="anthropic.claude-v2", query=query)
 
 
 
@@ -369,6 +370,108 @@ def demo_langchain_retrieval_qa_chain_3(bedrock_runtime,
     result = chat_agent.run(query)
     print(result)
 
+
+
+def demo_langchain_retrieval_qa_chain_4(bedrock_runtime, 
+                        embedding_model_id : str = "amazon.titan-embed-text-v1", 
+                        llm_model_id : str = "anthropic.claude-instant-v1", 
+                        llm_model_kwargs : dict = { "temperature": 0.0 },
+                        query : str = ""):
+
+    print(f"Call demo_langchain_retrieval_qa_chain_4 llm_model_id={llm_model_id} ")
+
+    VerboseFlag = False
+
+    # 1. Create Prompt Template for Claude
+
+    prompt_template = """The following is a friendly conversation between a human and an AI.
+    The AI is talkative and provides lots of specific details from its context. If the AI does not know the answer to a question, it truthfully says it does not know.
+    Do not use any XML tags in the answer.
+
+    Use the following context (delimited by <conversation_context></conversation_context>) and 
+    the chat history (delimited by <conversation_history></conversation_history>) to answer the question:
+
+    <conversation_context>
+    {context}
+    </conversation_context>
+
+    <conversation_history>
+    {history}
+    </conversation_history>
+
+    Based on the above, please answer the following question: {question}
+
+    Assistant:
+    """
+
+    PROMPT = PromptTemplate(
+        template=prompt_template, input_variables=['context', 'history', 'question']
+    )
+
+    # 2. Instantiate Claude Bedrock
+
+    embeddings = BedrockEmbeddings(
+        client = bedrock_runtime,
+        model_id = embedding_model_id
+    )
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
+    )
+
+    # 3. Create RetrievalQA
+
+    chain_type_kwargs = {
+        "prompt": PROMPT,
+        "memory": ConversationBufferMemory(
+                memory_key="history",
+                input_key="question",
+                ai_prefix="Assistant",
+                human_prefix="Human",
+                verbose=VerboseFlag,
+        )
+    }
+    vectordb = Chroma(embedding_function=embeddings, persist_directory=CHROMA_DB_PATH)
+    retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 3}) #search_kwargs.k defines number of ducuments to search
+
+    # Build the chain
+    #conversation = ConversationChain(
+    #    llm=cl_llm, 
+    #    verbose=True, 
+    #    memory=memory,
+    #    prompt=claude_prompt
+    #)
+
+    qa = RetrievalQA.from_chain_type(llm = llm, 
+                                 chain_type = "stuff", 
+                                 retriever = retriever, 
+                                 chain_type_kwargs = chain_type_kwargs, 
+                                 return_source_documents = False, 
+                                 verbose=VerboseFlag)
+    
+
+    # 4. Invoke
+    #print("-----------------------------------------------------")
+    #result = qa.run(query)
+    #print(result)
+
+    print("-----------------------------------------------------")
+    query_list = [
+        query,
+        "New York was named in honor of who?",
+        "What was the old name of New York in the year 1627?"
+    ]
+
+    for query in query_list: 
+        result = qa.run(query)
+        print(query)
+        print(result)
+
+
+
+########################################################################################
 
 def demo_langchain_converse_retrieval_chain_1(bedrock_runtime, 
                         embedding_model_id : str = "amazon.titan-embed-text-v1", 
