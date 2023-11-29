@@ -62,7 +62,7 @@ def demo_agents_serpapi(bedrock_runtime,
 
     tools = load_tools(['llm-math'], llm=llm) #tools = load_tools(['serpapi', 'llm-math'], llm=llm)
 
-    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True)
+    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True, max_iterations = 2)
 
     result = agent.run(prompt)
 
