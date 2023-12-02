@@ -22,7 +22,8 @@ from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 
 from langchain.agents import load_tools, initialize_agent, AgentType, Tool
 
-from langchain import SerpAPIWrapper, LLMMathChain
+from langchain.chains import LLMMathChain
+from langchain.utilities import SerpAPIWrapper
 
 def run_demo(session):
 
@@ -80,7 +81,7 @@ def demo_agents_tools_defnition_method1(bedrock_runtime,
         )
     ]
 
-    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True)
+    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True, max_iterations = 2)
 
     result = agent.run(prompt)
 
@@ -111,7 +112,7 @@ def demo_agents_serpapi(bedrock_runtime,
 
     tools = load_tools(['llm-math'], llm=llm) #tools = load_tools(['serpapi', 'llm-math'], llm=llm)
 
-    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True)
+    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True, max_iterations = 2)
 
     result = agent.run(prompt)
 
