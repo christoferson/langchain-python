@@ -11,6 +11,7 @@ from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain
 from langchain.text_splitter import CharacterTextSplitter
 
 from langchain.chains import LLMMathChain
+from langchain.utilities import SerpAPIWrapper
 
 def run_demo(session):
 
