@@ -37,7 +37,9 @@ def run_demo(session):
     llm_model_id = "anthropic.claude-instant-v1"
     embedding_model_id = "amazon.titan-embed-text-v1"
 
-    demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id)
+    user_prompt = "How many ammendments are there in the US constitution?"
+    demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id, user_prompt)
+    #demo_bedrock_knowledge_base_search(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id)
 
 ## 
 
@@ -87,11 +89,47 @@ def demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime,
     print("Received response:" + json.dumps(response, ensure_ascii=False))
 
     response_output = response['output']['text']
-   # citation = response['citations'][0].retrievedReferences.location.s3Location.uri
 
     print(f"--------------------------------------")
     print(f"Question: {user_prompt}")
     print(f"Answer: {response_output}")
+    print(f"--------------------------------------")
+
+
+
+## 
+
+def demo_bedrock_knowledge_base_search(session, bedrock_runtime, bedrock_agent_runtime,
+                                embedding_model_id="amazon.titan-embed-text-v1",
+                                user_prompt="What is the first ammendment?"):
+    
+    print(f"Call demo_bedrock_knowledge_base_search | user_prompt={user_prompt}")
+
+    # Knowledge Base
+    knowledge_base_id = config.bedrock_kb["id"]
+
+    response = bedrock_agent_runtime.retrieve(
+        knowledgeBaseId = knowledge_base_id,
+        retrievalQuery={
+            'text': user_prompt,
+        },
+        retrievalConfiguration={
+            'vectorSearchConfiguration': {
+                'numberOfResults': 3
+            }
+        }
+    )
+
+    print("Received response:" + json.dumps(response, ensure_ascii=False, indent=1))
+
+    print(f"--------------------------------------")
+
+    for i, retrievalResult in enumerate(response['retrievalResults']):
+        uri = retrievalResult['location']['s3Location']['uri']
+        excerpt = retrievalResult['content']['text'][0:75]
+        score = retrievalResult['score']
+        print(f"{i} RetrievalResult: {score} {uri} {excerpt}")
+        
     print(f"--------------------------------------")
 
 
