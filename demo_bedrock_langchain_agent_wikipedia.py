@@ -35,7 +35,8 @@ def run_demo(session):
 
     #demo_agents_wikipedia_connect(bedrock_runtime)
     #demo_agents_wikipedia(bedrock_runtime, prompt="When was Albert Einstein born? What is the year multiplied by 5?")
-    demo_agents_wikipedia(bedrock_runtime, prompt="When was Hunter x Hunter first aired? What is that year multiplied by 5?")
+    #demo_agents_wikipedia(bedrock_runtime, prompt="When was Hunter x Hunter first aired? What is that year multiplied by 5?")
+    demo_agents_wikipedia_2(bedrock_runtime, prompt="When was Hunter x Hunter first aired? Was it the same year as when Fairy Tale was aired?")
 
 
 def demo_agents_wikipedia_connect(bedrock_runtime, 
@@ -89,6 +90,32 @@ def demo_agents_wikipedia(bedrock_runtime,
     #print(result)
 
     tools = load_tools(['llm-math', 'wikipedia'], llm=llm)
+
+    agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True, max_iterations = 2)
+
+    result = agent.run(prompt)
+
+    print(result)
+
+
+
+def demo_agents_wikipedia_2(bedrock_runtime, 
+                        embedding_model_id : str = "amazon.titan-embed-text-v1", 
+                        llm_model_id : str = "anthropic.claude-instant-v1", 
+                        llm_model_kwargs : dict = { "temperature": 0.0 },
+                        prompt = ""):
+
+    print("Call demo_agents_wikipedia_2")
+
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id = llm_model_id,
+        model_kwargs = llm_model_kwargs,
+    )
+
+    #wikipedia = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+
+    tools = load_tools(['wikipedia'], llm=llm) #load_tools(['llm-math', 'wikipedia'], llm=llm)
 
     agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose = True, max_iterations = 2)
 
