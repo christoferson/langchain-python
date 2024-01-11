@@ -1,29 +1,9 @@
 import config
-from time import sleep
-import random
 import json
 
-from opensearchpy import helpers
-
-from langchain.document_loaders import CSVLoader
-from langchain.document_loaders import BSHTMLLoader
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WikipediaLoader
-from langchain.document_loaders import TextLoader
-
+from langchain.chains import RetrievalQA
 from langchain.chat_models import BedrockChat
-from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.prompts import HumanMessagePromptTemplate, ChatPromptTemplate
-
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import BedrockEmbeddings
-
-from langchain.vectorstores import Chroma
-
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-from requests_aws4auth import AWS4Auth
-
-from langchain.vectorstores import OpenSearchVectorSearch
+from langchain.retrievers import AmazonKnowledgeBasesRetriever
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
@@ -36,28 +16,49 @@ def run_demo(session):
 
     llm_model_id = "anthropic.claude-instant-v1"
     embedding_model_id = "amazon.titan-embed-text-v1"
+    llm_model_id = "anthropic.claude-v2"
+    model_kwargs = { "temperature": 0.0, 'max_tokens_to_sample': 200 }
 
     user_prompt = "How many ammendments are there in the US constitution?"
     user_prompt = "When was the 15th amendment ratified and what does it say?"
     #user_prompt = "What is AMICUS BRIE?"
     #user_prompt = "How is AMICUS BRIE different from AMICUS BRIEF?"
-    demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id, user_prompt)
-    #demo_bedrock_knowledge_base_search(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id)
+    demo_bedrock_langchain_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, llm_model_id, embedding_model_id, user_prompt)
 
 ## 
 
-def demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime,
+def demo_bedrock_langchain_knowledge_base(session, 
+                                bedrock_runtime, 
+                                bedrock_agent_runtime,
+                                llm_model_id="anthropic.claude-v2",
                                 embedding_model_id="amazon.titan-embed-text-v1",
                                 user_prompt="What is the first ammendment?"):
     
-    print(f"Call demo_bedrock_knowledge_base | user_prompt={user_prompt}")
+    print(f"Call demo_bedrock_langchain_knowledge_base | llm_model_id={llm_model_id} | user_prompt={user_prompt}")
 
     # Knowledge Base
     knowledge_base_id = config.bedrock_kb["id"]
 
-    # Select the model to use - Currently Anthropic is Supported
-    model_arn = 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2'
-    #model_arn = 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-instant-v1'
+    llm = BedrockChat(
+        client = bedrock_runtime,
+        model_id=llm_model_id,
+        model_kwargs={
+            "temperature": 0,
+            "max_tokens_to_sample":1024
+        }
+    )
+
+
+    retriever = AmazonKnowledgeBasesRetriever(
+        client=bedrock_agent_runtime,
+        knowledge_base_id=knowledge_base_id,
+        retrieval_config={
+            "vectorSearchConfiguration": {
+                "numberOfResults": 4
+            }
+        }
+    )
+
 
     # Construct the Prompt
     language = "en"
@@ -76,26 +77,22 @@ def demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime,
         Assistant:
         """
 
-    response = bedrock_agent_runtime.retrieve_and_generate(
-        input={
-            'text': prompt,
-        },
-        retrieveAndGenerateConfiguration={
-            'type': 'KNOWLEDGE_BASE',
-            'knowledgeBaseConfiguration': {
-                'knowledgeBaseId': knowledge_base_id,
-                'modelArn': model_arn,
-            }
-        }
+    qa = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type='stuff',
+        retriever=retriever,
+        verbose=True
     )
 
-    print("Received response:" + json.dumps(response, ensure_ascii=False))
+    query = "Does Amazon Bedrock support PrivateLink?"
+    result = qa.run(prompt)
 
-    response_output = response['output']['text']
+    #print("Received response:" + json.dumps(result, ensure_ascii=False))
+
 
     print(f"--------------------------------------")
     print(f"Question: {user_prompt}")
-    print(f"Answer: {response_output}")
+    print(f"Answer: {result}")
     print(f"--------------------------------------")
 
 
