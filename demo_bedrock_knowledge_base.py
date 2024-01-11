@@ -38,6 +38,9 @@ def run_demo(session):
     embedding_model_id = "amazon.titan-embed-text-v1"
 
     user_prompt = "How many ammendments are there in the US constitution?"
+    user_prompt = "When was the 15th amendment ratified and what does it say?"
+    #user_prompt = "What is AMICUS BRIE?"
+    #user_prompt = "How is AMICUS BRIE different from AMICUS BRIEF?"
     demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id, user_prompt)
     #demo_bedrock_knowledge_base_search(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id)
 
