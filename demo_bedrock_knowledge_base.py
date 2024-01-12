@@ -1,31 +1,13 @@
 import config
-from time import sleep
-import random
 import json
-
-from opensearchpy import helpers
 
 from langchain.document_loaders import CSVLoader
 from langchain.document_loaders import BSHTMLLoader
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import WikipediaLoader
 from langchain.document_loaders import TextLoader
-
 from langchain.chat_models import BedrockChat
-from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.prompts import HumanMessagePromptTemplate, ChatPromptTemplate
-
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import BedrockEmbeddings
-
-from langchain.vectorstores import Chroma
-
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-from requests_aws4auth import AWS4Auth
-
-from langchain.vectorstores import OpenSearchVectorSearch
-
-CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
 
 def run_demo(session):
 
@@ -35,22 +17,28 @@ def run_demo(session):
     bedrock_agent_runtime = session.client('bedrock-agent-runtime')
 
     llm_model_id = "anthropic.claude-instant-v1"
+    llm_model_id="anthropic.claude-v2"
     embedding_model_id = "amazon.titan-embed-text-v1"
 
     user_prompt = "How many ammendments are there in the US constitution?"
     user_prompt = "When was the 15th amendment ratified and what does it say?"
+    #user_prompt = "アメリカ憲法修正第 15 条はいつ批准されましたか? それには何が書かれていますか?"
     #user_prompt = "What is AMICUS BRIE?"
     #user_prompt = "How is AMICUS BRIE different from AMICUS BRIEF?"
-    demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id, user_prompt)
+    #demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime, llm_model_id, embedding_model_id, user_prompt)
+    demo_bedrock_knowledge_base_v2(session, bedrock_runtime, bedrock_agent_runtime, llm_model_id, embedding_model_id, user_prompt)
     #demo_bedrock_knowledge_base_search(session, bedrock_runtime, bedrock_agent_runtime, embedding_model_id)
 
 ## 
 
-def demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime,
+def demo_bedrock_knowledge_base(session, 
+                                bedrock_runtime, 
+                                bedrock_agent_runtime,
+                                llm_model_id="anthropic.claude-v2",
                                 embedding_model_id="amazon.titan-embed-text-v1",
                                 user_prompt="What is the first ammendment?"):
     
-    print(f"Call demo_bedrock_knowledge_base | user_prompt={user_prompt}")
+    print(f"Call demo_bedrock_knowledge_base | llm_model_id={llm_model_id} | user_prompt={user_prompt}")
 
     # Knowledge Base
     knowledge_base_id = config.bedrock_kb["id"]
@@ -60,7 +48,8 @@ def demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime,
     #model_arn = 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-instant-v1'
 
     # Construct the Prompt
-    language = "en"
+    language = "ja"
+
     prompt = f"""\n\nHuman:
     Answer the question after [Question] corectly. 
     [Question]
@@ -99,6 +88,51 @@ def demo_bedrock_knowledge_base(session, bedrock_runtime, bedrock_agent_runtime,
     print(f"--------------------------------------")
 
 
+##
+
+
+def demo_bedrock_knowledge_base_v2(session, 
+                                bedrock_runtime, 
+                                bedrock_agent_runtime,
+                                llm_model_id="anthropic.claude-v2",
+                                embedding_model_id="amazon.titan-embed-text-v1",
+                                user_prompt="What is the first ammendment?"):
+    
+    print(f"Call demo_bedrock_knowledge_base_v2 | llm_model_id={llm_model_id} | user_prompt={user_prompt}")
+
+    # Knowledge Base
+    knowledge_base_id = config.bedrock_kb["id"]
+
+    # Select the model to use - Currently Anthropic is Supported
+    model_arn = 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2'
+    #model_arn = 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-instant-v1'
+
+    # Construct the Prompt
+    prompt = f"""\n\nHuman: {user_prompt}
+    Assistant:
+    """
+
+    response = bedrock_agent_runtime.retrieve_and_generate(
+        input={
+            'text': prompt,
+        },
+        retrieveAndGenerateConfiguration={
+            'type': 'KNOWLEDGE_BASE',
+            'knowledgeBaseConfiguration': {
+                'knowledgeBaseId': knowledge_base_id,
+                'modelArn': model_arn,
+            }
+        }
+    )
+
+    print("Received response:" + json.dumps(response, ensure_ascii=False))
+
+    response_output = response['output']['text']
+
+    print(f"--------------------------------------")
+    print(f"Question: {user_prompt}")
+    print(f"Answer: {response_output}")
+    print(f"--------------------------------------")
 
 ## 
 
@@ -137,3 +171,17 @@ def demo_bedrock_knowledge_base_search(session, bedrock_runtime, bedrock_agent_r
 
 
 
+
+
+"""
+Question: アメリカ憲法修正第 15 条はいつ批准されましたか? それには何が書かれていますか?
+Answer: アメリカ合衆国憲法修正第15条は1869年2月26日に議会を通過し、1870年2月3日に批准されました。 
+この修正条項では、人種、肌の色、または以前の隷属状態に基づいて、アメリカ合衆国またはいか
+なる州も、市民の投票権を否定または制限することを禁止しています。
+"""
+
+"""
+Question: When was the 15th amendment ratified and what does it say?
+Answer: The 15th Amendment was ratified on February 3, 1870. The 15th Amendment states that the right of citizens 
+to vote shall not be denied or abridged based on race, color, or previous condition of servitude.
+"""
