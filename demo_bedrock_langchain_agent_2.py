@@ -1,14 +1,14 @@
 import sys
 import config
 import os
-from langchain.llms import Bedrock
+from langchain_community.llms import Bedrock
 from langchain.chains import LLMChain
-from langchain.agents import XMLAgent
+from langchain.agents import XMLAgent, create_xml_agent
 from langchain.agents.agent import AgentExecutor
 from langchain.agents import Tool
-from langchain.tools import DuckDuckGoSearchRun
+from langchain_community.tools import DuckDuckGoSearchRun
 
-from langchain.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import WebBaseLoader
 
 def web_page_reader(url: str) -> str:
     loader = WebBaseLoader(url)
@@ -26,3 +26,45 @@ def run_demo(session):
     model_kwargs = { "temperature": 0.0, 'max_tokens_to_sample': 200 }
 
     print("OK")
+
+    prompt = "今日の日本のニュースを教えてください。"
+    prompt = "次のページを要約してください https://aws.amazon.com/jp/bedrock/"
+    run_demo_agent_search(bedrock_runtime, prompt)
+
+def run_demo_agent_search(bedrock_runtime, prompt):
+    
+    search = DuckDuckGoSearchRun()
+
+    tools = [
+        Tool(
+            name="duckduckgo-search",
+            func=search.run,
+            description="このツールはWeb上の最新情報を検索します。引数で検索キーワードを受け取ります。最新情報が必要ない場合はこのツールは使用しません。",
+        ),
+        Tool(
+            name = "WebBaseLoader",
+            func=web_page_reader,
+            description="このツールは引数でURLを渡された場合に内容をテキストで返却します。引数にはURLの文字列のみを受け付けます。"
+        )
+    ]
+
+    llm = Bedrock(
+        client = bedrock_runtime,
+        model_id="anthropic.claude-v2",
+        model_kwargs={"max_tokens_to_sample": 2000}, # 最大トークン数は大きめに
+        verbose=True
+    )
+
+    chain = LLMChain(
+        llm=llm,
+        prompt=XMLAgent.get_default_prompt(),
+        output_parser=XMLAgent.get_default_output_parser()
+    )
+
+    agent = XMLAgent(tools=tools, llm_chain=chain)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False, handle_parsing_errors=True)
+
+    agent_prompt = f"特に言語の指定が無い場合はあなたは質問に対して日本語で回答します。{prompt}"
+    print(f"Invoking Agent with prompt: {agent_prompt}")
+    answer = agent_executor.invoke({"input": agent_prompt})
+    print(answer['output'])
