@@ -1,13 +1,13 @@
 import config
 import json
 
-from langchain.document_loaders import CSVLoader
-from langchain.document_loaders import BSHTMLLoader
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WikipediaLoader
-from langchain.document_loaders import TextLoader
-from langchain.chat_models import BedrockChat
-from langchain.embeddings import BedrockEmbeddings
+from langchain_community.document_loaders import CSVLoader
+from langchain_community.document_loaders import BSHTMLLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import WikipediaLoader
+from langchain_community.document_loaders import TextLoader
+from langchain_community.chat_models import BedrockChat
+from langchain_community.embeddings import BedrockEmbeddings
 
 def run_demo(session):
 

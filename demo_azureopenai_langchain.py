@@ -2,7 +2,7 @@ import os
 import config
 import openai
 
-from langchain.llms import AzureOpenAI
+from langchain_community.llms import AzureOpenAI
 
 
 def run_demo():
