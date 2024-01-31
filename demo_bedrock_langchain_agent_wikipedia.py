@@ -10,14 +10,6 @@ from langchain_community.vectorstores import Chroma
 
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain_community.chat_models import BedrockChat
-from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.prompts import PromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
-from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain, SequentialChain
-
-from langchain.text_splitter import CharacterTextSplitter
-
-from langchain.chains.question_answering import load_qa_chain
-from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 
 from langchain.agents import load_tools, initialize_agent, AgentType
 
@@ -33,29 +25,15 @@ def run_demo(session):
     model_id = "anthropic.claude-instant-v1"
     model_kwargs = { "temperature": 0.0, 'max_tokens_to_sample': 200 }
 
-    #demo_agents_wikipedia_connect(bedrock_runtime)
-    #demo_agents_wikipedia(bedrock_runtime, prompt="When was Albert Einstein born? What is the year multiplied by 5?")
+    #demo_agents_wikipedia_connect()
+    demo_agents_wikipedia(bedrock_runtime, prompt="When was Albert Einstein born? What is the year multiplied by 5?")
     #demo_agents_wikipedia(bedrock_runtime, prompt="When was Hunter x Hunter first aired? What is that year multiplied by 5?")
-    demo_agents_wikipedia_2(bedrock_runtime, prompt="When was Hunter x Hunter first aired? Was it the same year as when Fairy Tale was aired?")
+    #demo_agents_wikipedia_2(bedrock_runtime, prompt="When was Hunter x Hunter first aired? Was it the same year as when Fairy Tale was aired?")
 
 
-def demo_agents_wikipedia_connect(bedrock_runtime, 
-                        embedding_model_id : str = "amazon.titan-embed-text-v1", 
-                        llm_model_id : str = "anthropic.claude-instant-v1", 
-                        llm_model_kwargs : dict = { "temperature": 0.0 }):
+def demo_agents_wikipedia_connect():
 
     print("Call demo_agents_wikipedia_connect")
-
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
-
-    llm = BedrockChat(
-        client = bedrock_runtime,
-        model_id = llm_model_id,
-        model_kwargs = llm_model_kwargs,
-    )
 
     wikipedia = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
 
@@ -64,18 +42,13 @@ def demo_agents_wikipedia_connect(bedrock_runtime,
     print(result)
 
 
-def demo_agents_wikipedia(bedrock_runtime, 
-                        embedding_model_id : str = "amazon.titan-embed-text-v1", 
+def demo_agents_wikipedia(bedrock_runtime,
                         llm_model_id : str = "anthropic.claude-instant-v1", 
                         llm_model_kwargs : dict = { "temperature": 0.0 },
                         prompt = ""):
 
     print("Call demo_agents_wikipedia")
 
-    embeddings = BedrockEmbeddings(
-        client = bedrock_runtime,
-        model_id = embedding_model_id
-    )
 
     llm = BedrockChat(
         client = bedrock_runtime,

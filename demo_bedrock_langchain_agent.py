@@ -1,15 +1,15 @@
 import os
 import config
 
-from langchain.document_loaders import CSVLoader
-from langchain.document_loaders import BSHTMLLoader
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WikipediaLoader
+from langchain_community.document_loaders import CSVLoader
+from langchain_community.document_loaders import BSHTMLLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import WikipediaLoader
 
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
-from langchain.embeddings import BedrockEmbeddings
-from langchain.chat_models import BedrockChat
+from langchain_community.embeddings import BedrockEmbeddings
+from langchain_community.chat_models import BedrockChat
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain, SequentialChain
@@ -23,7 +23,7 @@ from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.agents import load_tools, initialize_agent, AgentType, Tool
 
 from langchain.chains import LLMMathChain
-from langchain.utilities import SerpAPIWrapper
+from langchain_community.utilities import SerpAPIWrapper
 
 def run_demo(session):
 
