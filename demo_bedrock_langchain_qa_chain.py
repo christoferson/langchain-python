@@ -1,15 +1,15 @@
 
-from langchain.llms import Bedrock
+from langchain_community.llms import Bedrock
 
-from langchain.document_loaders import CSVLoader
-from langchain.document_loaders import BSHTMLLoader
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WikipediaLoader
+from langchain_community.document_loaders import CSVLoader
+from langchain_community.document_loaders import BSHTMLLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import WikipediaLoader
 
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
-from langchain.embeddings import BedrockEmbeddings
-from langchain.chat_models import BedrockChat
+from langchain_community.embeddings import BedrockEmbeddings
+from langchain_community.chat_models import BedrockChat
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain
