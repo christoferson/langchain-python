@@ -1,17 +1,17 @@
-from langchain.document_loaders import CSVLoader
-from langchain.document_loaders import BSHTMLLoader
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WikipediaLoader
-from langchain.document_loaders import TextLoader
+from langchain_community.document_loaders import CSVLoader
+from langchain_community.document_loaders import BSHTMLLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import WikipediaLoader
+from langchain_community.document_loaders import TextLoader
 
-from langchain.chat_models import BedrockChat
+from langchain_community.chat_models import BedrockChat
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import HumanMessagePromptTemplate, ChatPromptTemplate
 
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import BedrockEmbeddings
+from langchain_community.embeddings import BedrockEmbeddings
 
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
 
 CHROMA_DB_PATH = "vectordb/chromadb/demo.db"
