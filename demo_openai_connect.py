@@ -4,7 +4,7 @@ import json
 import openai
 import config
 
-from langchain.llms import AzureOpenAI
+from langchain_community.llms import AzureOpenAI
 
 def run_demo():
 
