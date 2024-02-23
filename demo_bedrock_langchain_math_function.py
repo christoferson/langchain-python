@@ -1,9 +1,9 @@
-from langchain.document_loaders import CSVLoader
-from langchain.document_loaders import BSHTMLLoader
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import WikipediaLoader
+from langchain_community.document_loaders import CSVLoader
+from langchain_community.document_loaders import BSHTMLLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import WikipediaLoader
 
-from langchain.chat_models import BedrockChat
+from langchain_community.chat_models import BedrockChat
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain
@@ -11,7 +11,7 @@ from langchain.chains import TransformChain, LLMChain, SimpleSequentialChain
 from langchain.text_splitter import CharacterTextSplitter
 
 from langchain.chains import LLMMathChain
-from langchain.utilities import SerpAPIWrapper
+from langchain_community.utilities import SerpAPIWrapper
 
 def run_demo(session):
 
